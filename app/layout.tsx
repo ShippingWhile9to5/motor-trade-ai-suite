@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { env } from "../env";
 import "./globals.css";
@@ -17,9 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8">
-          {children}
-        </main>
+        <ClerkProvider>
+          <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8">
+            {children}
+          </main>
+        </ClerkProvider>
       </body>
     </html>
   );
