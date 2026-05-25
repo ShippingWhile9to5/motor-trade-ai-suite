@@ -1,31 +1,15 @@
 "use client";
 
 import { type ChangeEvent, type DragEvent, useRef, useState } from "react";
-
-const allowedMimeTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-]);
-
-const allowedExtensions = new Set(["pdf", "jpg", "jpeg", "png", "heic", "heif"]);
+import {
+  allowedFileExtensions,
+  allowedFileMimeTypes,
+  validateUploadFile,
+} from "../../lib/validation/files";
 
 type FileUploadProps = {
   onFilesChange?: (files: File[]) => void;
 };
-
-function getFileExtension(fileName: string) {
-  return fileName.split(".").pop()?.toLowerCase() ?? "";
-}
-
-function isAllowedFile(file: File) {
-  return (
-    allowedMimeTypes.has(file.type) ||
-    allowedExtensions.has(getFileExtension(file.name))
-  );
-}
 
 function getFileKey(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`;
@@ -52,10 +36,21 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
 
   function addFiles(files: FileList | File[]) {
     const incomingFiles = Array.from(files);
-    const acceptedFiles = incomingFiles.filter(isAllowedFile);
-    const rejectedFileNames = incomingFiles
-      .filter((file) => !isAllowedFile(file))
-      .map((file) => file.name);
+    const acceptedFiles: File[] = [];
+    const rejectedFileMessages: string[] = [];
+
+    incomingFiles.forEach((file) => {
+      const validation = validateUploadFile(file);
+
+      if (validation.success) {
+        acceptedFiles.push(file);
+        return;
+      }
+
+      rejectedFileMessages.push(
+        `${file.name}: ${validation.errors.map((error) => error.message).join(" ")}`,
+      );
+    });
 
     const existingFileKeys = new Set(selectedFiles.map(getFileKey));
     const newFiles = acceptedFiles.filter(
@@ -63,7 +58,7 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
     );
 
     updateSelectedFiles([...selectedFiles, ...newFiles]);
-    setRejectedFiles(rejectedFileNames);
+    setRejectedFiles(rejectedFileMessages);
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -103,7 +98,7 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,application/pdf,image/jpeg,image/png,image/heic,image/heif"
+          accept={[...allowedFileExtensions, ...allowedFileMimeTypes].join(",")}
           className="sr-only"
           onChange={handleInputChange}
         />
@@ -122,7 +117,12 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
 
       {rejectedFiles.length > 0 ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Unsupported file type: {rejectedFiles.join(", ")}
+          <p className="font-medium">Some files could not be selected.</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {rejectedFiles.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
