@@ -120,5 +120,75 @@ export const factFindExtractionSchema = z
   })
   .strict();
 
+export const extractionStatusSchema = z.enum([
+  "queued",
+  "processing",
+  "review_required",
+  "approved",
+  "failed",
+]);
+
+export const extractionRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    case_id: z.string().uuid(),
+    document_id: z.string().uuid(),
+    user_id: z.string().min(1),
+    status: extractionStatusSchema,
+    raw_result_json: factFindExtractionSchema.nullable(),
+    reviewed_result_json: factFindExtractionSchema.nullable(),
+    error_message: z.string().nullable(),
+    created_at: z.string().datetime({ offset: true }),
+    updated_at: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export const createExtractionInputSchema = z
+  .object({
+    case_id: z.string().uuid(),
+    document_id: z.string().uuid(),
+    user_id: z.string().min(1),
+    status: extractionStatusSchema.default("queued"),
+    raw_result_json: factFindExtractionSchema.nullish(),
+    reviewed_result_json: factFindExtractionSchema.nullish(),
+    error_message: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const getExtractionByCaseIdInputSchema = z
+  .object({
+    case_id: z.string().uuid(),
+    user_id: z.string().min(1),
+  })
+  .strict();
+
+export const updateExtractionInputSchema = z
+  .object({
+    id: z.string().uuid(),
+    user_id: z.string().min(1),
+    status: extractionStatusSchema.optional(),
+    raw_result_json: factFindExtractionSchema.nullable().optional(),
+    reviewed_result_json: factFindExtractionSchema.nullable().optional(),
+    error_message: z.string().nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      input.status !== undefined ||
+      input.raw_result_json !== undefined ||
+      input.reviewed_result_json !== undefined ||
+      input.error_message !== undefined,
+    {
+      message: "At least one extraction field must be provided for update.",
+    },
+  );
+
 export type ExtractionField = z.infer<typeof extractionFieldSchema>;
 export type FactFindExtraction = z.infer<typeof factFindExtractionSchema>;
+export type ExtractionStatus = z.infer<typeof extractionStatusSchema>;
+export type ExtractionRecord = z.infer<typeof extractionRecordSchema>;
+export type CreateExtractionInput = z.infer<typeof createExtractionInputSchema>;
+export type GetExtractionByCaseIdInput = z.infer<
+  typeof getExtractionByCaseIdInputSchema
+>;
+export type UpdateExtractionInput = z.infer<typeof updateExtractionInputSchema>;
