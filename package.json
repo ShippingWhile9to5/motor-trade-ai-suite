@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:integration": "tsc -p tsconfig.integration-test.json && node --conditions=react-server --test .test-build/tests/integration/*.test.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
