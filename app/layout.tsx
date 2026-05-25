@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { env } from "../env";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Motor Trade AI Suite",
   description: "Workflow platform for motor trade insurance submissions.",
 };
+
+void env;
 
 export default function RootLayout({
   children,
