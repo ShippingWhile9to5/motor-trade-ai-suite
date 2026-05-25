@@ -1,4 +1,8 @@
-export default function DashboardPage() {
+import { requireUser } from "../../lib/auth";
+
+export default async function DashboardPage() {
+  await requireUser();
+
   return (
     <section className="flex flex-1 flex-col justify-center gap-6">
       <div>
