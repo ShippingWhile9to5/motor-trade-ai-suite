@@ -6,6 +6,8 @@ import { getCaseDocumentsAction } from "../../../actions/documents";
 import { getExtractionAction } from "../../../actions/extractions";
 import { getReviewAction } from "../../../actions/reviews";
 import { getSubmissionAction } from "../../../actions/submissions";
+import { CaseUploadSection } from "./case-upload-section";
+import { ExtractionTrigger } from "./extraction-trigger";
 
 type CaseDetailPageProps = {
   params: Promise<{
@@ -118,6 +120,11 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                 : "No extraction result yet."}
             </p>
           </div>
+          <ExtractionTrigger
+            caseId={caseRecord.id}
+            documentReferenceId={documents[0]?.id}
+            extractionStatus={extraction?.status}
+          />
         </section>
 
         <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
@@ -149,12 +156,14 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         </section>
       </div>
 
+      <CaseUploadSection caseId={caseRecord.id} />
+
       <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Documents
           </h2>
-          <p className="text-sm text-slate-500">{documents.length} selected</p>
+          <p className="text-sm text-slate-500">{documents.length} uploaded</p>
         </div>
 
         {documents.length === 0 ? (
@@ -175,7 +184,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   <p className="truncate text-sm font-medium text-slate-950">
                     {document.file_name}
                   </p>
-                  <p className="text-xs text-slate-500">{document.file_type}</p>
+                  <p className="text-xs text-slate-500">
+                    {document.file_type} - Uploaded {formatDate(document.uploaded_at)}
+                  </p>
                 </div>
                 <p className="text-sm text-slate-500">
                   {formatFileSize(document.file_size)}
