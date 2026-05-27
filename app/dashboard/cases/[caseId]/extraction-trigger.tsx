@@ -49,7 +49,7 @@ export function ExtractionTrigger({
     <div className="mt-4 space-y-3">
       <button
         type="button"
-        className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+        className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
         disabled={isPending || !documentReferenceId}
         onClick={handleRunExtraction}
       >
@@ -59,7 +59,9 @@ export function ExtractionTrigger({
       <p className="text-sm text-slate-600">
         {extractionStatus
           ? `Current extraction status: ${extractionStatus}.`
-          : "Uses the first saved document reference."}
+          : documentReferenceId
+            ? "Uses the first saved document reference."
+            : "No document is available for extraction yet."}
       </p>
 
       {error ? (

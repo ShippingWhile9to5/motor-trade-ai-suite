@@ -101,7 +101,7 @@ export function SubmissionPanel({
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+    <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -118,6 +118,17 @@ export function SubmissionPanel({
       </div>
 
       <div className="mt-4 space-y-4">
+        {!hasApprovedReview ? (
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-slate-950">
+              Submission unavailable.
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Approve the review before generating a draft.
+            </p>
+          </div>
+        ) : null}
+
         <div>
           <label
             htmlFor="submission_text"
@@ -129,7 +140,7 @@ export function SubmissionPanel({
             id="submission_text"
             value={submissionText}
             rows={10}
-            className="mt-2 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-950"
+            className="mt-2 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-3 text-sm leading-6 text-slate-950"
             placeholder="Generate a submission draft from an approved review."
             onChange={(event) => setSubmissionText(event.target.value)}
           />
@@ -145,7 +156,7 @@ export function SubmissionPanel({
           <select
             id="submission_status"
             value={submissionStatus}
-            className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 sm:max-w-xs"
+            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 sm:max-w-xs"
             onChange={(event) =>
               setSubmissionStatus(event.target.value as SubmissionStatus)
             }
@@ -174,7 +185,7 @@ export function SubmissionPanel({
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
-          className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+          className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           disabled={isGenerating || !hasApprovedReview}
           onClick={handleGenerate}
         >
@@ -182,7 +193,7 @@ export function SubmissionPanel({
         </button>
         <button
           type="button"
-          className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
+          className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
           disabled={isSaving || !submission}
           onClick={handleSave}
         >

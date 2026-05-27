@@ -41,6 +41,53 @@ function StatusValue({ children }: { children: React.ReactNode }) {
   );
 }
 
+function WorkflowProgress({
+  steps,
+}: {
+  steps: Array<{
+    label: string;
+    detail: string;
+    isComplete: boolean;
+    isCurrent: boolean;
+  }>;
+}) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Workflow progress
+      </h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((step) => (
+          <div
+            key={step.label}
+            className={`rounded-md border px-4 py-3 ${
+              step.isComplete
+                ? "border-emerald-200 bg-emerald-50"
+                : step.isCurrent
+                  ? "border-sky-200 bg-sky-50"
+                  : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span
+                className={`h-3 w-3 shrink-0 rounded-full ${
+                  step.isComplete
+                    ? "bg-emerald-500"
+                    : step.isCurrent
+                      ? "bg-sky-500"
+                      : "bg-slate-300"
+                }`}
+              />
+              <p className="text-sm font-medium text-slate-950">{step.label}</p>
+            </div>
+            <p className="mt-2 text-sm text-slate-600">{step.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { caseId } = await params;
   const parsedCaseId = z.string().uuid().safeParse(caseId);
@@ -67,6 +114,42 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         extraction_id: extraction.id,
       })
     : null;
+  const hasDocuments = documents.length > 0;
+  const hasExtraction = Boolean(extraction);
+  const hasApprovedReview = review?.review_status === "approved";
+  const isSubmissionReady =
+    submission?.submission_status === "ready" ||
+    submission?.submission_status === "submitted";
+  const workflowSteps = [
+    {
+      label: "Uploaded",
+      detail: hasDocuments
+        ? `${documents.length} document${documents.length === 1 ? "" : "s"} saved`
+        : "No documents yet",
+      isComplete: hasDocuments,
+      isCurrent: !hasDocuments,
+    },
+    {
+      label: "Extracted",
+      detail: extraction?.status ?? (hasDocuments ? "Ready to run" : "Waiting for upload"),
+      isComplete: hasExtraction,
+      isCurrent: hasDocuments && !hasExtraction,
+    },
+    {
+      label: "Reviewed",
+      detail: review?.review_status ?? (hasExtraction ? "Awaiting review" : "Waiting for extraction"),
+      isComplete: hasApprovedReview,
+      isCurrent: hasExtraction && !hasApprovedReview,
+    },
+    {
+      label: "Submission ready",
+      detail:
+        submission?.submission_status ??
+        (hasApprovedReview ? "Ready to generate" : "Waiting for approved review"),
+      isComplete: isSubmissionReady,
+      isCurrent: hasApprovedReview && !isSubmissionReady,
+    },
+  ];
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -91,8 +174,10 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         </div>
       </header>
 
+      <WorkflowProgress steps={workflowSteps} />
+
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Case metadata
           </h2>
@@ -110,7 +195,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           </dl>
         </section>
 
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Extraction
           </h2>
@@ -119,7 +204,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             <p className="text-sm text-slate-600">
               {extraction
                 ? `Last updated ${formatDate(extraction.updated_at)}.`
-                : "No extraction result yet."}
+                : hasDocuments
+                  ? "No extraction result yet. Run extraction when ready."
+                  : "Upload a document before running extraction."}
             </p>
           </div>
           <ExtractionTrigger
@@ -129,7 +216,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           />
         </section>
 
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Review
           </h2>
@@ -138,12 +225,14 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             <p className="text-sm text-slate-600">
               {review?.reviewed_at
                 ? `Reviewed ${formatDate(review.reviewed_at)}.`
-                : "No review recorded yet."}
+                : hasExtraction
+                  ? "Extraction is available for review."
+                  : "No review available until extraction has run."}
             </p>
           </div>
         </section>
 
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Submission
           </h2>
@@ -152,7 +241,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             <p className="text-sm text-slate-600">
               {submission
                 ? `Created ${formatDate(submission.created_at)}.`
-                : "No submission draft yet."}
+                : hasApprovedReview
+                  ? "Approved review is ready for submission generation."
+                  : "No submission draft until review is approved."}
             </p>
           </div>
         </section>
@@ -174,7 +265,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
 
       <CaseUploadSection caseId={caseRecord.id} />
 
-      <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+      <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Documents
@@ -183,10 +274,10 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         </div>
 
         {documents.length === 0 ? (
-          <div className="mt-4 rounded-md border border-dashed border-slate-300 px-4 py-6 text-center">
+          <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
             <p className="text-sm font-medium text-slate-950">No documents yet.</p>
             <p className="mt-1 text-sm text-slate-600">
-              Uploaded document references will appear here.
+              Upload a PDF or photo to start the workflow.
             </p>
           </div>
         ) : (

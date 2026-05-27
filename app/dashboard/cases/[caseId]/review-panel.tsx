@@ -170,19 +170,22 @@ export function ReviewPanel({
 
   if (!reviewedOutput) {
     return (
-      <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+      <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Review extraction
         </h2>
-        <p className="mt-3 text-sm text-slate-600">
-          No extraction output is available yet.
-        </p>
+        <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-slate-950">No review available.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Run extraction before reviewing fields.
+          </p>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white px-4 py-4">
+    <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -279,7 +282,7 @@ export function ReviewPanel({
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
-          className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+          className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           disabled={isPending}
           onClick={() => submitReview("approved")}
         >
@@ -287,7 +290,7 @@ export function ReviewPanel({
         </button>
         <button
           type="button"
-          className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
+          className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
           disabled={isPending}
           onClick={() => submitReview("needs_changes")}
         >

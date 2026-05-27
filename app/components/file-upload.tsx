@@ -131,14 +131,14 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
         <div className="mt-5 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <button
             type="button"
-            className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+            className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
             onClick={() => inputRef.current?.click()}
           >
             Choose files
           </button>
           <button
             type="button"
-            className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 sm:w-auto"
+            className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 sm:w-auto"
             onClick={() => cameraInputRef.current?.click()}
           >
             Take photo
@@ -172,7 +172,7 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
               </div>
               <button
                 type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-950"
                 aria-label={`Remove ${file.name}`}
                 onClick={() => removeFile(file)}
               >
