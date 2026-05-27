@@ -8,6 +8,7 @@ import { getReviewAction } from "../../../actions/reviews";
 import { getSubmissionAction } from "../../../actions/submissions";
 import { CaseUploadSection } from "./case-upload-section";
 import { ExtractionTrigger } from "./extraction-trigger";
+import { ReviewPanel } from "./review-panel";
 
 type CaseDetailPageProps = {
   params: Promise<{
@@ -155,6 +156,13 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           </div>
         </section>
       </div>
+
+      <ReviewPanel
+        caseId={caseRecord.id}
+        extractionId={extraction?.id}
+        extractionOutput={extraction?.raw_result_json ?? null}
+        review={review}
+      />
 
       <CaseUploadSection caseId={caseRecord.id} />
 
