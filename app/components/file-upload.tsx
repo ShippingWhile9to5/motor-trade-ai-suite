@@ -11,6 +11,19 @@ type FileUploadProps = {
   onFilesChange?: (files: File[]) => void;
 };
 
+const fileAccept = [...allowedFileExtensions, ...allowedFileMimeTypes].join(",");
+const cameraFileAccept = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".heic",
+  ".heif",
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+].join(",");
+
 function getFileKey(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`;
 }
@@ -25,6 +38,7 @@ function formatFileSize(size: number) {
 
 export function FileUpload({ onFilesChange }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -84,7 +98,7 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
   return (
     <div className="w-full space-y-4">
       <div
-        className={`flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed px-6 py-8 text-center transition ${
+        className={`flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition sm:px-6 sm:py-8 ${
           isDragging
             ? "border-sky-500 bg-sky-50"
             : "border-slate-300 bg-white hover:border-slate-400"
@@ -98,7 +112,15 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
           ref={inputRef}
           type="file"
           multiple
-          accept={[...allowedFileExtensions, ...allowedFileMimeTypes].join(",")}
+          accept={fileAccept}
+          className="sr-only"
+          onChange={handleInputChange}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept={cameraFileAccept}
+          capture="environment"
           className="sr-only"
           onChange={handleInputChange}
         />
@@ -106,13 +128,22 @@ export function FileUpload({ onFilesChange }: FileUploadProps) {
           Drop files here or choose from your device
         </p>
         <p className="mt-2 text-sm text-slate-600">PDF, JPG, PNG, HEIC, HEIF</p>
-        <button
-          type="button"
-          className="mt-5 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          onClick={() => inputRef.current?.click()}
-        >
-          Choose files
-        </button>
+        <div className="mt-5 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            className="w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose files
+          </button>
+          <button
+            type="button"
+            className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50 sm:w-auto"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            Take photo
+          </button>
+        </div>
       </div>
 
       {rejectedFiles.length > 0 ? (
