@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listCasesAction } from "../actions/cases";
+import { CreateCaseForm } from "./create-case-form";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -25,6 +26,8 @@ export default async function DashboardPage() {
           Current motor trade cases and workflow status.
         </p>
       </header>
+
+      <CreateCaseForm />
 
       {cases.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-8 text-center sm:px-6">

@@ -72,6 +72,7 @@ export async function uploadCaseDocumentsAction(formData: FormData) {
   for (const file of files) {
     const result = await createUploadReference({
       case_id: userCase.id,
+      user_id: user.userId,
       file,
     });
 

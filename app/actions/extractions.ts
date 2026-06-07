@@ -48,13 +48,20 @@ export async function executeExtractionAction(input: unknown) {
     };
   }
 
-  return executeExtractionWorkflow(
-    {
-      document_reference_id: documentReference.id,
-      user_id: user.userId,
-    },
-    factFindProvider,
-  );
+  try {
+    return await executeExtractionWorkflow(
+      {
+        document_reference_id: documentReference.id,
+        user_id: user.userId,
+      },
+      factFindProvider,
+    );
+  } catch {
+    return {
+      success: false as const,
+      error: "Extraction could not be created.",
+    };
+  }
 }
 
 export async function getExtractionAction(input: unknown) {

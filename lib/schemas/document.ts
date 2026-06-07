@@ -20,6 +20,8 @@ export const documentReferenceSchema = documentMetadataSchema
 export const createDocumentReferenceInputSchema = documentReferenceSchema.omit({
   id: true,
   uploaded_at: true,
+}).extend({
+  user_id: z.string().min(1),
 });
 
 export const getDocumentReferenceInputSchema = z

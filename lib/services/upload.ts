@@ -8,6 +8,7 @@ import { validateUploadFile } from "../validation/files";
 export const createUploadReferenceInputSchema = z
   .object({
     case_id: z.string().uuid(),
+    user_id: z.string().min(1),
     file: z.instanceof(File),
   })
   .strict();
@@ -17,7 +18,7 @@ function buildStoragePath(caseId: string, file: File) {
 }
 
 export async function createUploadReference(input: unknown) {
-  const { case_id, file } = createUploadReferenceInputSchema.parse(input);
+  const { case_id, user_id, file } = createUploadReferenceInputSchema.parse(input);
   const validation = validateUploadFile(file);
 
   if (!validation.success) {
@@ -37,7 +38,11 @@ export async function createUploadReference(input: unknown) {
   });
 
   const reference = await createDocumentReferenceWorkflow({
-    ...metadata,
+    case_id: metadata.case_id,
+    user_id,
+    file_name: metadata.file_name,
+    file_type: metadata.file_type,
+    file_size: metadata.file_size,
     storage_path: buildStoragePath(case_id, file),
   });
 

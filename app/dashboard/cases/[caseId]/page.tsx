@@ -88,6 +88,14 @@ function WorkflowProgress({
   );
 }
 
+async function safelyLoad<T>(loader: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await loader();
+  } catch {
+    return fallback;
+  }
+}
+
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { caseId } = await params;
   const parsedCaseId = z.string().uuid().safeParse(caseId);
@@ -103,16 +111,20 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   }
 
   const [documents, extraction, submission] = await Promise.all([
-    getCaseDocumentsAction({ case_id: caseRecord.id }),
-    getExtractionAction({ case_id: caseRecord.id }),
-    getSubmissionAction({ case_id: caseRecord.id }),
+    safelyLoad(() => getCaseDocumentsAction({ case_id: caseRecord.id }), []),
+    safelyLoad(() => getExtractionAction({ case_id: caseRecord.id }), null),
+    safelyLoad(() => getSubmissionAction({ case_id: caseRecord.id }), null),
   ]);
 
   const review = extraction
-    ? await getReviewAction({
-        case_id: caseRecord.id,
-        extraction_id: extraction.id,
-      })
+    ? await safelyLoad(
+        () =>
+          getReviewAction({
+            case_id: caseRecord.id,
+            extraction_id: extraction.id,
+          }),
+        null,
+      )
     : null;
   const hasDocuments = documents.length > 0;
   const hasExtraction = Boolean(extraction);

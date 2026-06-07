@@ -62,7 +62,24 @@ The app will start on the local Next.js dev server, usually:
 http://localhost:3000
 ```
 
-### 5. Validate before handing off changes
+### 5. Test from a phone on the same Wi-Fi
+
+Use the LAN dev server script:
+
+```bash
+npm run dev:lan
+```
+
+Open the app on the phone using the Mac's LAN address:
+
+```bash
+http://192.168.0.181:3001
+```
+
+If the Mac's LAN address changes, update `allowedDevOrigins` in `next.config.ts`
+to match the new address, then restart the dev server.
+
+### 6. Validate before handing off changes
 
 ```bash
 npm run typecheck

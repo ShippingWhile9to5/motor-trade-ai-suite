@@ -3,20 +3,23 @@ import path from "node:path";
 import test from "node:test";
 
 type ExtractionRow = Record<string, unknown>;
+type DocumentRow = Record<string, unknown>;
 
 const extractionRows: ExtractionRow[] = [];
+const documentRows: DocumentRow[] = [];
 
 function createFakeSupabase() {
   return {
     from(tableName: string) {
-      assert.equal(tableName, "extractions");
+      assert.ok(["documents", "extractions"].includes(tableName));
 
+      const rows = tableName === "documents" ? documentRows : extractionRows;
       const filters: Array<{ column: string; value: unknown }> = [];
-      let insertData: ExtractionRow | null = null;
-      let updateData: ExtractionRow | null = null;
+      let insertData: DocumentRow | ExtractionRow | null = null;
+      let updateData: DocumentRow | ExtractionRow | null = null;
 
       const matchingRows = () =>
-        extractionRows.filter((row) =>
+        rows.filter((row) =>
           filters.every((filter) => row[filter.column] === filter.value),
         );
 
@@ -49,10 +52,10 @@ function createFakeSupabase() {
               id: crypto.randomUUID(),
               ...insertData,
               created_at: now,
-              updated_at: now,
+              ...(tableName === "extractions" ? { updated_at: now } : {}),
             };
 
-            extractionRows.push(row);
+            rows.push(row);
 
             return { data: row, error: null };
           }
@@ -98,6 +101,9 @@ test("placeholder extraction pipeline runs through persistence", async () => {
   const { createDocumentReferenceWorkflow } = require(
     "../../lib/services/storage",
   ) as typeof import("../../lib/services/storage");
+  const { getDocumentReferenceWorkflow } = require(
+    "../../lib/services/storage",
+  ) as typeof import("../../lib/services/storage");
   const { executeExtractionWorkflow } = require(
     "../../lib/services/extraction-execution",
   ) as typeof import(
@@ -118,11 +124,22 @@ test("placeholder extraction pipeline runs through persistence", async () => {
   const userId = "user_test_123";
   const documentReference = await createDocumentReferenceWorkflow({
     case_id: caseId,
+    user_id: userId,
     file_name: "fact-find.pdf",
     file_type: "application/pdf",
     file_size: 1024,
     storage_path: `cases/${caseId}/fact-find.pdf`,
   });
+  assert.equal(documentRows.length, 1);
+  assert.equal(documentRows[0].id, documentReference.id);
+  assert.deepEqual(
+    documentRows.filter((row) => row.id === documentReference.id),
+    [documentRows[0]],
+  );
+  assert.deepEqual(
+    await getDocumentReferenceWorkflow({ id: documentReference.id }),
+    documentReference,
+  );
 
   const result = await executeExtractionWorkflow(
     {
@@ -132,10 +149,10 @@ test("placeholder extraction pipeline runs through persistence", async () => {
     factFindProvider,
   );
 
-  assert.equal(result.success, true);
-
   if (!result.success) {
-    throw new Error("Expected extraction execution to succeed.");
+    throw new Error(
+      `Expected extraction execution to succeed: ${JSON.stringify(result)}`,
+    );
   }
 
   assert.equal(result.extraction.case_id, caseId);
