@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireUser } from "../../lib/auth";
 import {
   createCaseWorkflow,
+  deleteCaseWorkflow,
   getCaseWorkflow,
   listCasesForUserWorkflow,
   updateCaseWorkflow,
@@ -17,6 +18,12 @@ const createCaseActionInputSchema = z
   .strict();
 
 const getCaseActionInputSchema = z
+  .object({
+    id: z.string().uuid(),
+  })
+  .strict();
+
+const deleteCaseActionInputSchema = z
   .object({
     id: z.string().uuid(),
   })
@@ -59,6 +66,20 @@ export async function listCasesAction() {
   return listCasesForUserWorkflow({
     user_id: user.userId,
   });
+}
+
+export async function deleteCaseAction(input: unknown) {
+  const user = await requireUser();
+  const data = deleteCaseActionInputSchema.parse(input);
+
+  const deletedCase = await deleteCaseWorkflow({
+    id: data.id,
+    user_id: user.userId,
+  });
+
+  return {
+    deleted: Boolean(deletedCase),
+  };
 }
 
 export async function updateCaseAction(input: unknown) {

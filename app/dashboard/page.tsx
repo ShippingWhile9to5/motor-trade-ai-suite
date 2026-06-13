@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listCasesAction } from "../actions/cases";
 import { CreateCaseForm } from "./create-case-form";
+import { DeleteCaseButton } from "./delete-case-button";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -39,25 +40,35 @@ export default async function DashboardPage() {
       ) : (
         <div className="space-y-3">
           {cases.map((caseRecord) => (
-            <Link
+            <article
               key={caseRecord.id}
-              href={`/dashboard/cases/${caseRecord.id}`}
-              className="block rounded-md border border-slate-200 bg-white px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50 sm:px-5"
+              className="rounded-md border border-slate-200 bg-white px-4 py-4 sm:px-5"
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-medium text-slate-950">
-                    {caseRecord.client_name}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Updated {formatDate(caseRecord.updated_at)}
-                  </p>
-                </div>
-                <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
-                  {caseRecord.status}
-                </span>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <Link
+                  href={`/dashboard/cases/${caseRecord.id}`}
+                  className="min-w-0 flex-1 rounded-md transition hover:text-slate-700"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-base font-medium text-slate-950">
+                        {caseRecord.client_name}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Updated {formatDate(caseRecord.updated_at)}
+                      </p>
+                    </div>
+                    <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
+                      {caseRecord.status}
+                    </span>
+                  </div>
+                </Link>
+                <DeleteCaseButton
+                  caseId={caseRecord.id}
+                  clientName={caseRecord.client_name}
+                />
               </div>
-            </Link>
+            </article>
           ))}
         </div>
       )}

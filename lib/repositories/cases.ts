@@ -5,6 +5,7 @@ import {
   type CreateCaseInput,
   caseSchema,
   createCaseInputSchema,
+  deleteCaseInputSchema,
   getCaseByIdInputSchema,
   listCasesForUserInputSchema,
   updateCaseInputSchema,
@@ -89,6 +90,22 @@ export async function listCasesForUser(input: unknown): Promise<Case[]> {
   throwSupabaseError(error);
 
   return caseSchema.array().parse(rows ?? []);
+}
+
+export async function deleteCase(input: unknown): Promise<Case | null> {
+  const data = deleteCaseInputSchema.parse(input);
+
+  const { data: row, error } = await supabase
+    .from("cases")
+    .delete()
+    .eq("id", data.id)
+    .eq("user_id", data.user_id)
+    .select(caseSelect)
+    .maybeSingle();
+
+  throwSupabaseError(error);
+
+  return row ? parseCaseRow(row) : null;
 }
 
 export async function updateCase(input: unknown): Promise<Case | null> {

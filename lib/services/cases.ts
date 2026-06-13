@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 import {
   createCase,
+  deleteCase,
   getCaseById,
   listCasesForUser,
   updateCase,
@@ -25,6 +26,13 @@ export const getCaseByIdServiceInputSchema = z
 
 export const listCasesForUserServiceInputSchema = z
   .object({
+    user_id: z.string().min(1),
+  })
+  .strict();
+
+export const deleteCaseServiceInputSchema = z
+  .object({
+    id: z.string().uuid(),
     user_id: z.string().min(1),
   })
   .strict();
@@ -60,6 +68,12 @@ export async function listCasesForUserWorkflow(input: unknown) {
   const data = listCasesForUserServiceInputSchema.parse(input);
 
   return listCasesForUser(data);
+}
+
+export async function deleteCaseWorkflow(input: unknown) {
+  const data = deleteCaseServiceInputSchema.parse(input);
+
+  return deleteCase(data);
 }
 
 export async function updateCaseWorkflow(input: unknown) {

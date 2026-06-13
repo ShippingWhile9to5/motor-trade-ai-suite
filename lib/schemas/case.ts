@@ -40,6 +40,13 @@ export const listCasesForUserInputSchema = z
   })
   .strict();
 
+export const deleteCaseInputSchema = z
+  .object({
+    id: z.string().uuid(),
+    user_id: z.string().min(1),
+  })
+  .strict();
+
 export const updateCaseInputSchema = z
   .object({
     id: z.string().uuid(),
@@ -75,6 +82,7 @@ export type Case = z.infer<typeof caseSchema>;
 export type CreateCaseInput = z.infer<typeof createCaseInputSchema>;
 export type GetCaseByIdInput = z.infer<typeof getCaseByIdInputSchema>;
 export type ListCasesForUserInput = z.infer<typeof listCasesForUserInputSchema>;
+export type DeleteCaseInput = z.infer<typeof deleteCaseInputSchema>;
 export type UpdateCaseInput = z.infer<typeof updateCaseInputSchema>;
 export type Document = z.infer<typeof documentSchema>;
 export type SubmissionOutput = z.infer<typeof submissionOutputSchema>;
