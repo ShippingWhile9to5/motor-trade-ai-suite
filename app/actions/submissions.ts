@@ -44,7 +44,14 @@ const getSubmissionActionInputSchema = z
   .strict();
 
 async function getOwnedApprovedReview(input: unknown, userId: string) {
-  const data = ownedReviewInputSchema.parse(input);
+  const candidate =
+    input && typeof input === "object"
+      ? {
+          case_id: (input as Record<string, unknown>).case_id,
+          extraction_id: (input as Record<string, unknown>).extraction_id,
+        }
+      : input;
+  const data = ownedReviewInputSchema.parse(candidate);
   const userCase = await getCaseWorkflow({
     id: data.case_id,
     user_id: userId,

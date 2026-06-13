@@ -45,6 +45,9 @@ function createFakeSupabase() {
         limit() {
           return builder;
         },
+        returns() {
+          return Promise.resolve({ data: matchingRows(), error: null });
+        },
         async single() {
           if (insertData) {
             const now = new Date().toISOString();
@@ -160,22 +163,22 @@ test("placeholder extraction pipeline runs through persistence", async () => {
   assert.equal(result.extraction.user_id, userId);
   assert.equal(result.extraction.status, "review_required");
   assert.equal(
-    result.extraction.raw_result_json?.business_details.client_name.value,
+    result.extraction.raw_result_json?.company_details.company_name.value,
     "",
   );
   assert.equal(
-    result.extraction.raw_result_json?.business_details.client_name
+    result.extraction.raw_result_json?.company_details.company_name
       .requires_review,
     true,
   );
   assert.equal(
-    result.extraction.raw_result_json?.business_details.client_name
+    result.extraction.raw_result_json?.company_details.company_name
       .is_missing_required,
     true,
   );
   assert.ok(
     result.missing_required_fields.some(
-      (group) => group.section === "business_details",
+      (group) => group.section === "company_details",
     ),
   );
 

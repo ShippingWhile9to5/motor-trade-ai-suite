@@ -20,6 +20,14 @@ const filePathDocumentSelect =
 const contentTypeDocumentSelect =
   "id,case_id,file_name,content_type,file_size,file_path,created_at";
 
+const documentReadCandidates = [
+  { select: documentSelect, orderBy: "created_at" },
+  { select: mixedDocumentSelect, orderBy: "created_at" },
+  { select: filePathDocumentSelect, orderBy: "created_at" },
+  { select: contentTypeDocumentSelect, orderBy: "created_at" },
+  { select: legacyDocumentSelect, orderBy: "uploaded_at" },
+];
+
 type DocumentRow = {
   id: string;
   case_id: string;
@@ -60,6 +68,26 @@ function assertDocumentRow(row: DocumentRow | null): DocumentRow {
   }
 
   return row;
+}
+
+function tryParseDocumentRow(row: DocumentRow) {
+  const parsed = documentReferenceSchema.safeParse({
+    id: row.id,
+    case_id: row.case_id,
+    file_name: row.filename ?? row.file_name,
+    file_type: row.mime_type ?? row.file_type ?? row.content_type,
+    file_size: row.size_bytes ?? row.file_size,
+    storage_path: row.storage_path ?? row.file_path,
+    uploaded_at: row.created_at ?? row.uploaded_at,
+  });
+
+  return parsed.success ? parsed.data : null;
+}
+
+function parseReadableDocumentRows(rows: DocumentRow[] | null) {
+  const documents = rows?.map(tryParseDocumentRow).filter(Boolean) ?? [];
+
+  return documents as DocumentReference[];
 }
 
 function needsLegacyDocumentColumns(error: { message: string } | null) {
@@ -200,134 +228,63 @@ export async function getDocumentReference(
   input: unknown,
 ): Promise<DocumentReference | null> {
   const { id } = getDocumentReferenceInputSchema.parse(input);
-  let { data: row, error } = await supabase
-    .from("documents")
-    .select(documentSelect)
-    .eq("id", id)
-    .maybeSingle<DocumentRow>();
+  let lastError: { message: string } | null = null;
 
-  if (needsLegacyDocumentColumns(error)) {
-    const retry = isMissingColumn(error, "file_name")
-      ? await supabase
-          .from("documents")
-          .select(mixedDocumentSelect)
-          .eq("id", id)
-          .maybeSingle<DocumentRow>()
-      : await supabase
-          .from("documents")
-          .select(legacyDocumentSelect)
-          .eq("id", id)
-          .maybeSingle<DocumentRow>();
-
-    row = retry.data;
-    error = retry.error;
-  }
-
-  if (isMissingColumn(error, "file_type")) {
-    const retry = await supabase
+  for (const candidate of documentReadCandidates) {
+    const { data: row, error } = await supabase
       .from("documents")
-      .select(mixedDocumentSelect)
+      .select(candidate.select)
       .eq("id", id)
       .maybeSingle<DocumentRow>();
 
-    row = retry.data;
-    error = retry.error;
+    if (error) {
+      lastError = error;
+      continue;
+    }
+
+    if (!row) {
+      return null;
+    }
+
+    const document = tryParseDocumentRow(row);
+
+    if (document) {
+      return document;
+    }
   }
 
-  if (isMissingColumn(error, "storage_path")) {
-    const retry = await supabase
-      .from("documents")
-      .select(filePathDocumentSelect)
-      .eq("id", id)
-      .maybeSingle<DocumentRow>();
+  throwSupabaseError(lastError);
 
-    row = retry.data;
-    error = retry.error;
-  }
-
-  if (isMissingColumn(error, "mime_type")) {
-    const retry = await supabase
-      .from("documents")
-      .select(contentTypeDocumentSelect)
-      .eq("id", id)
-      .maybeSingle<DocumentRow>();
-
-    row = retry.data;
-    error = retry.error;
-  }
-
-  throwSupabaseError(error);
-
-  return row ? parseDocumentRow(row) : null;
+  return null;
 }
 
 export async function listCaseDocuments(
   input: unknown,
 ): Promise<DocumentReference[]> {
   const { case_id } = listCaseDocumentsInputSchema.parse(input);
-  let { data: rows, error } = await supabase
-    .from("documents")
-    .select(documentSelect)
-    .eq("case_id", case_id)
-    .order("created_at", { ascending: false })
-    .returns<DocumentRow[]>();
+  let lastError: { message: string } | null = null;
 
-  if (needsLegacyDocumentColumns(error)) {
-    const retry = isMissingColumn(error, "file_name")
-      ? await supabase
-          .from("documents")
-          .select(mixedDocumentSelect)
-          .eq("case_id", case_id)
-          .order("created_at", { ascending: false })
-          .returns<DocumentRow[]>()
-      : await supabase
-          .from("documents")
-          .select(legacyDocumentSelect)
-          .eq("case_id", case_id)
-          .order("uploaded_at", { ascending: false })
-          .returns<DocumentRow[]>();
-
-    rows = retry.data;
-    error = retry.error;
-  }
-
-  if (isMissingColumn(error, "file_type")) {
-    const retry = await supabase
+  for (const candidate of documentReadCandidates) {
+    const { data: rows, error } = await supabase
       .from("documents")
-      .select(mixedDocumentSelect)
+      .select(candidate.select)
       .eq("case_id", case_id)
-      .order("created_at", { ascending: false })
+      .order(candidate.orderBy, { ascending: false })
       .returns<DocumentRow[]>();
 
-    rows = retry.data;
-    error = retry.error;
+    if (error) {
+      lastError = error;
+      continue;
+    }
+
+    const documents = parseReadableDocumentRows(rows ?? []);
+
+    if (documents.length > 0 || rows?.length === 0) {
+      return documents;
+    }
   }
 
-  if (isMissingColumn(error, "storage_path")) {
-    const retry = await supabase
-      .from("documents")
-      .select(filePathDocumentSelect)
-      .eq("case_id", case_id)
-      .order("created_at", { ascending: false })
-      .returns<DocumentRow[]>();
+  throwSupabaseError(lastError);
 
-    rows = retry.data;
-    error = retry.error;
-  }
-
-  if (isMissingColumn(error, "mime_type")) {
-    const retry = await supabase
-      .from("documents")
-      .select(contentTypeDocumentSelect)
-      .eq("case_id", case_id)
-      .order("created_at", { ascending: false })
-      .returns<DocumentRow[]>();
-
-    rows = retry.data;
-    error = retry.error;
-  }
-
-  throwSupabaseError(error);
-
-  return (rows ?? []).map(parseDocumentRow);
+  return [];
 }

@@ -50,10 +50,14 @@ export function ExtractionTrigger({
       <button
         type="button"
         className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
-        disabled={isPending || !documentReferenceId}
+        disabled={isPending || !documentReferenceId || Boolean(extractionStatus)}
         onClick={handleRunExtraction}
       >
-        {isPending ? "Running extraction..." : "Run extraction"}
+        {isPending
+          ? "Running extraction..."
+          : extractionStatus
+            ? "Extraction created"
+            : "Run extraction"}
       </button>
 
       <p className="text-sm text-slate-600">

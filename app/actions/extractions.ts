@@ -56,10 +56,16 @@ export async function executeExtractionAction(input: unknown) {
       },
       factFindProvider,
     );
-  } catch {
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Extraction could not be created.";
+
     return {
       success: false as const,
-      error: "Extraction could not be created.",
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Extraction could not be created."
+          : message,
     };
   }
 }

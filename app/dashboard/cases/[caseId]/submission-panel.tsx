@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -111,6 +112,12 @@ export function SubmissionPanel({
             Generate from an approved review, then edit before marking ready or
             submitted.
           </p>
+          <Link
+            href={`/dashboard/cases/${caseId}/submission-composer`}
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-sky-700 hover:text-sky-900"
+          >
+            Open submission composer
+          </Link>
         </div>
         <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
           {submissionStatus}

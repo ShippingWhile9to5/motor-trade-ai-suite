@@ -35,14 +35,19 @@ export type ExtractionValidationResult =
   | ExtractionValidationErrorResult;
 
 const sectionLabels: Record<ExtractionSection, string> = {
-  business_details: "Business details",
-  premises: "Premises",
-  security: "Security",
-  vehicles_and_stock: "Vehicles and stock",
-  drivers: "Drivers",
+  company_details: "Company details",
+  premises_details: "Premises details",
+  business_activities: "Business activities",
+  sums_insured_and_covers: "Sums insured and covers",
+  turnover_split: "Turnover split",
+  employee_details: "Employee details",
+  road_risks: "Road risks",
+  driver_details: "Driver details",
+  vehicle_details: "Vehicle details",
+  existing_cover_and_notes: "Existing cover and notes",
   claims_history: "Claims history",
-  current_insurance: "Current insurance",
-  cover_required: "Cover required",
+  declarations: "Declarations",
+  additional_notes: "Additional notes",
 };
 
 function isExtractionField(value: unknown): value is ExtractionField {
@@ -104,14 +109,6 @@ export function getGroupedMissingExtractionFields(
     ([section, sectionValue]) => {
       const typedSection = section as ExtractionSection;
       const fields = collectMissingFields(sectionValue, typedSection);
-
-      if (typedSection === "drivers" && extraction.drivers.length === 0) {
-        fields.push({
-          path: "drivers",
-          label: "drivers",
-          source_reference: "",
-        });
-      }
 
       if (fields.length === 0) {
         return [];

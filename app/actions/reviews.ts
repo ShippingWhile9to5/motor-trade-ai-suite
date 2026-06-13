@@ -52,7 +52,14 @@ async function getOwnedExtraction(
   input: unknown,
   userId: string,
 ): Promise<ExtractionRecord | null> {
-  const data = reviewOwnershipInputSchema.parse(input);
+  const candidate =
+    input && typeof input === "object"
+      ? {
+          case_id: (input as Record<string, unknown>).case_id,
+          extraction_id: (input as Record<string, unknown>).extraction_id,
+        }
+      : input;
+  const data = reviewOwnershipInputSchema.parse(candidate);
   const extraction = await getExtractionByCaseIdWorkflow({
     case_id: data.case_id,
     user_id: userId,

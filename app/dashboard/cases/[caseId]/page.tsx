@@ -127,7 +127,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
       )
     : null;
   const hasDocuments = documents.length > 0;
-  const hasExtraction = Boolean(extraction);
+  const hasExtraction = Boolean(extraction?.raw_result_json);
   const hasApprovedReview = review?.review_status === "approved";
   const isSubmissionReady =
     submission?.submission_status === "ready" ||
@@ -143,7 +143,12 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     },
     {
       label: "Extracted",
-      detail: extraction?.status ?? (hasDocuments ? "Ready to run" : "Waiting for upload"),
+      detail:
+        hasExtraction
+          ? extraction?.status ?? "review_required"
+          : hasDocuments
+            ? "Ready to run"
+            : "Waiting for upload",
       isComplete: hasExtraction,
       isCurrent: hasDocuments && !hasExtraction,
     },
@@ -224,7 +229,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <ExtractionTrigger
             caseId={caseRecord.id}
             documentReferenceId={documents[0]?.id}
-            extractionStatus={extraction?.status}
+            extractionStatus={hasExtraction ? extraction?.status : undefined}
           />
         </section>
 
@@ -257,6 +262,12 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   ? "Approved review is ready for submission generation."
                   : "No submission draft until review is approved."}
             </p>
+            <Link
+              href={`/dashboard/cases/${caseRecord.id}/submission-composer`}
+              className="inline-flex min-h-11 items-center text-sm font-medium text-sky-700 hover:text-sky-900"
+            >
+              Open submission composer
+            </Link>
           </div>
         </section>
       </div>
