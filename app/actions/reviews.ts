@@ -8,6 +8,7 @@ import {
 } from "../../lib/schemas/extraction";
 import { reviewStatusSchema } from "../../lib/schemas/review";
 import { getExtractionByCaseIdWorkflow } from "../../lib/services/extractions";
+import { updateExtractionWorkflow } from "../../lib/services/extractions";
 import {
   createReviewWorkflow,
   getReviewByExtractionIdWorkflow,
@@ -81,13 +82,23 @@ export async function createReviewAction(input: unknown) {
     return null;
   }
 
-  return createReviewWorkflow({
+  const review = await createReviewWorkflow({
     extraction_id: extraction.id,
     reviewer_user_id: user.userId,
     reviewed_output: data.reviewed_output,
     review_status: data.review_status,
     reviewed_at: data.reviewed_at ?? null,
   });
+
+  await updateExtractionWorkflow({
+    id: extraction.id,
+    user_id: user.userId,
+    status: data.review_status === "approved" ? "approved" : "review_required",
+    reviewed_result_json:
+      data.review_status === "approved" ? data.reviewed_output : null,
+  });
+
+  return review;
 }
 
 export async function updateReviewAction(input: unknown) {
@@ -99,7 +110,7 @@ export async function updateReviewAction(input: unknown) {
     return null;
   }
 
-  return updateReviewWorkflow({
+  const review = await updateReviewWorkflow({
     extraction_id: extraction.id,
     reviewer_user_id: user.userId,
     ...(data.reviewed_output !== undefined
@@ -108,6 +119,35 @@ export async function updateReviewAction(input: unknown) {
     ...(data.review_status !== undefined ? { review_status: data.review_status } : {}),
     ...(data.reviewed_at !== undefined ? { reviewed_at: data.reviewed_at } : {}),
   });
+
+  if (!review) {
+    return null;
+  }
+
+  await updateExtractionWorkflow({
+    id: extraction.id,
+    user_id: user.userId,
+    ...(data.review_status !== undefined
+      ? {
+          status:
+            data.review_status === "approved" ? "approved" : "review_required",
+        }
+      : {}),
+    ...(data.review_status !== undefined && data.review_status !== "approved"
+      ? { reviewed_result_json: null }
+      : data.reviewed_output !== undefined
+      ? {
+          reviewed_result_json:
+            data.review_status === "approved" ||
+            (data.review_status === undefined &&
+              review.review_status === "approved")
+              ? data.reviewed_output
+              : null,
+        }
+      : {}),
+  });
+
+  return review;
 }
 
 export async function getReviewAction(input: unknown) {
@@ -119,7 +159,23 @@ export async function getReviewAction(input: unknown) {
     return null;
   }
 
-  return getReviewByExtractionIdWorkflow({
+  const review = await getReviewByExtractionIdWorkflow({
     extraction_id: extraction.id,
   });
+
+  if (review) {
+    return review;
+  }
+
+  if (extraction.status === "approved" && extraction.reviewed_result_json) {
+    return {
+      extraction_id: extraction.id,
+      reviewer_user_id: user.userId,
+      reviewed_output: extraction.reviewed_result_json,
+      review_status: "approved" as const,
+      reviewed_at: extraction.updated_at,
+    };
+  }
+
+  return null;
 }

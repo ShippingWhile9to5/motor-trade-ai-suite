@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  generateSubmissionComposerOutputs,
-} from "../../../../../lib/submission-composer";
+import { generateSubmissionComposerOutputs } from "../../../../../lib/submission-composer";
 import type {
   SubmissionComposerBusinessType,
   SubmissionComposerInput,
@@ -21,25 +19,19 @@ type ComposerPanelProps = {
 type CopyState = "idle" | "copied" | "failed";
 
 const businessTypeLabels: Record<SubmissionComposerBusinessType, string> = {
-  mot_servicing: "Service, Repair and MOT",
+  mot_servicing: "Car Servicing, Repair and MOT",
   bodyshop: "Bodyshop",
-  car_sales: "Car Sales",
-  combined: "Combined",
+  car_sales: "Car Sales (Used)",
+  combined: "Car Sales and Servicing Combined",
 };
 
 const stockProfileLabels: Record<SubmissionComposerStockProfile, string> = {
-  standard: "Standard",
-  mid_range: "Mid-range",
-  prestige: "Prestige",
+  standard: "Standard Used Cars (up to GBP 15k average)",
+  mid_range: "Mid-Range/Premium (GBP 15k-GBP 50k average)",
+  prestige: "Prestige/Exotic (GBP 50k+ average)",
 };
 
-function CopyButton({
-  text,
-  label,
-}: {
-  text: string;
-  label: string;
-}) {
+function CopyButton({ text }: { text: string }) {
   const [state, setState] = useState<CopyState>("idle");
 
   async function handleCopy() {
@@ -53,18 +45,36 @@ function CopyButton({
     }
   }
 
-  const buttonLabel =
-    state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : label;
-
   return (
     <button
       type="button"
       className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50"
       onClick={handleCopy}
     >
-      {buttonLabel}
+      {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
     </button>
   );
+}
+
+function FormSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </h2>
+      <div className="mt-5 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function FieldGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid gap-4 md:grid-cols-2">{children}</div>;
 }
 
 function TextInput({
@@ -135,20 +145,14 @@ function CheckboxInput({
   );
 }
 
-function OutputCard({
-  title,
-  text,
-}: {
-  title: string;
-  text: string;
-}) {
+function OutputCard({ title, text }: { title: string; text: string }) {
   return (
     <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           {title}
         </h2>
-        <CopyButton text={text} label="Copy" />
+        <CopyButton text={text} />
       </div>
       <textarea
         readOnly
@@ -171,14 +175,16 @@ export function SubmissionComposerPanel({
     [formData],
   );
 
+  const hasStockProfile =
+    formData.business_type === "car_sales" || formData.business_type === "combined";
+  const hasPrestigeFields =
+    hasStockProfile && formData.stock_profile === "prestige";
+
   function updateField<Key extends keyof SubmissionComposerInput>(
     key: Key,
     value: SubmissionComposerInput[Key],
   ) {
-    setFormData((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setFormData((current) => ({ ...current, [key]: value }));
   }
 
   return (
@@ -196,9 +202,8 @@ export function SubmissionComposerPanel({
               Submission Composer
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              Use the reviewed fact-find data as your starting point, then tune
-              the wording here for Acturis notes and insurer emails without
-              losing the case context.
+              Smart form and generated outputs for Acturis notes and insurer
+              email text.
             </p>
           </div>
           <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
@@ -207,21 +212,13 @@ export function SubmissionComposerPanel({
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <section className="space-y-6">
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Smart form
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              One business type setting drives the wording across all outputs so
-              the text stays aligned with the risk you are presenting.
-            </p>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <FormSection title="Business Type">
+            <FieldGrid>
               <label className="block">
                 <span className="block text-sm font-medium text-slate-950">
-                  Business type
+                  Select Business Type
                 </span>
                 <select
                   value={formData.business_type}
@@ -234,9 +231,7 @@ export function SubmissionComposerPanel({
                   }
                 >
                   {(
-                    Object.entries(
-                      businessTypeLabels,
-                    ) as Array<
+                    Object.entries(businessTypeLabels) as Array<
                       [SubmissionComposerBusinessType, string]
                     >
                   ).map(([value, label]) => (
@@ -247,111 +242,208 @@ export function SubmissionComposerPanel({
                 </select>
               </label>
 
-              <label className="block">
-                <span className="block text-sm font-medium text-slate-950">
-                  Stock profile
-                </span>
-                <select
-                  value={formData.stock_profile}
-                  className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-                  onChange={(event) =>
-                    updateField(
-                      "stock_profile",
-                      event.target.value as SubmissionComposerStockProfile,
-                    )
-                  }
-                >
-                  {(
-                    Object.entries(
-                      stockProfileLabels,
-                    ) as Array<
-                      [SubmissionComposerStockProfile, string]
-                    >
-                  ).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {hasStockProfile ? (
+                <label className="block">
+                  <span className="block text-sm font-medium text-slate-950">
+                    Stock Profile
+                  </span>
+                  <select
+                    value={formData.stock_profile}
+                    className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                    onChange={(event) =>
+                      updateField(
+                        "stock_profile",
+                        event.target.value as SubmissionComposerStockProfile,
+                      )
+                    }
+                  >
+                    {(
+                      Object.entries(stockProfileLabels) as Array<
+                        [SubmissionComposerStockProfile, string]
+                      >
+                    ).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </FieldGrid>
+          </FormSection>
 
+          <FormSection title="Basic Information">
+            <TextInput
+              label="Business Name"
+              value={formData.business_name}
+              onChange={(value) => updateField("business_name", value)}
+            />
+            <TextInput
+              label="Director/Owner Name"
+              value={formData.director_name}
+              onChange={(value) => updateField("director_name", value)}
+            />
+            <FieldGrid>
               <TextInput
-                label="Business name"
-                value={formData.business_name}
-                onChange={(value) => updateField("business_name", value)}
-              />
-              <TextInput
-                label="Director or proposer"
-                value={formData.director_name}
-                onChange={(value) => updateField("director_name", value)}
-              />
-              <TextInput
-                label="Established"
+                label="Established Year"
                 value={formData.established_year}
                 onChange={(value) => updateField("established_year", value)}
               />
               <TextInput
-                label="Trade experience"
+                label="Incorporated Year (if applicable)"
+                value={formData.incorporated_year}
+                onChange={(value) => updateField("incorporated_year", value)}
+              />
+              <TextInput
+                label="Total Motor Trade Experience (years)"
                 value={formData.trade_experience}
                 onChange={(value) => updateField("trade_experience", value)}
               />
               <TextInput
-                label="No claims bonus"
+                label="Motor Trade NCB (claim-free years)"
                 value={formData.no_claims_bonus}
                 onChange={(value) => updateField("no_claims_bonus", value)}
               />
+            </FieldGrid>
+            {hasPrestigeFields ? (
               <TextInput
-                label="Location"
-                value={formData.location}
-                onChange={(value) => updateField("location", value)}
+                label="Years Experience in Prestige Car Sales Specifically"
+                value={formData.prestige_experience}
+                onChange={(value) => updateField("prestige_experience", value)}
+              />
+            ) : null}
+          </FormSection>
+
+          <FormSection title="Business Activities">
+            <TextInput
+              label="Primary Operations"
+              value={formData.primary_operations}
+              onChange={(value) => updateField("primary_operations", value)}
+            />
+            <FieldGrid>
+              <TextInput
+                label="% Standard Private Cars"
+                value={formData.private_cars_percent}
+                onChange={(value) => updateField("private_cars_percent", value)}
               />
               <TextInput
-                label="Average vehicle value"
+                label="% Light Commercial Vehicles"
+                value={formData.light_commercial_vehicles_percent}
+                onChange={(value) =>
+                  updateField("light_commercial_vehicles_percent", value)
+                }
+              />
+              <TextInput
+                label="% Classic Cars"
+                value={formData.classics_percent}
+                onChange={(value) => updateField("classics_percent", value)}
+              />
+              <TextInput
+                label="% Bikes (if any)"
+                value={formData.bikes_percent}
+                onChange={(value) => updateField("bikes_percent", value)}
+              />
+              <TextInput
+                label="Average Vehicle Value (GBP)"
                 value={formData.average_vehicle_value}
                 onChange={(value) =>
                   updateField("average_vehicle_value", value)
                 }
               />
               <TextInput
-                label="Maximum vehicle value"
+                label="Max Value Any One Vehicle (GBP)"
                 value={formData.maximum_vehicle_value}
                 onChange={(value) =>
                   updateField("maximum_vehicle_value", value)
                 }
               />
+            </FieldGrid>
+            {hasStockProfile ? (
               <TextInput
-                label="Underwriter name"
-                value={formData.underwriter_name}
-                onChange={(value) => updateField("underwriter_name", value)}
+                label="Sale of Used Cars - Max Value (GBP)"
+                value={formData.maximum_used_car_value}
+                onChange={(value) =>
+                  updateField("maximum_used_car_value", value)
+                }
+              />
+            ) : null}
+            {formData.business_type !== "car_sales" ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <CheckboxInput
+                  label="MOT Testing"
+                  checked={formData.work_mot}
+                  onChange={(checked) => updateField("work_mot", checked)}
+                />
+                <CheckboxInput
+                  label="Servicing"
+                  checked={formData.work_servicing}
+                  onChange={(checked) => updateField("work_servicing", checked)}
+                />
+                <CheckboxInput
+                  label="Repairs"
+                  checked={formData.work_repairs}
+                  onChange={(checked) => updateField("work_repairs", checked)}
+                />
+                <CheckboxInput
+                  label="Bodywork"
+                  checked={formData.work_bodywork}
+                  onChange={(checked) => updateField("work_bodywork", checked)}
+                />
+                <CheckboxInput
+                  label="Welding"
+                  checked={formData.work_welding}
+                  onChange={(checked) => updateField("work_welding", checked)}
+                />
+                <CheckboxInput
+                  label="Paint Spraying"
+                  checked={formData.paint_spraying}
+                  onChange={(checked) => updateField("paint_spraying", checked)}
+                />
+              </div>
+            ) : null}
+            <FieldGrid>
+              <TextInput
+                label="Welding % (if applicable)"
+                value={formData.welding_percentage}
+                onChange={(value) => updateField("welding_percentage", value)}
               />
               <TextInput
-                label="Target premium"
-                value={formData.target_premium}
-                onChange={(value) => updateField("target_premium", value)}
+                label="Paint Spraying % (if applicable)"
+                value={formData.paint_spraying_percentage}
+                onChange={(value) =>
+                  updateField("paint_spraying_percentage", value)
+                }
               />
-            </div>
+            </FieldGrid>
+          </FormSection>
 
-            <div className="mt-4 space-y-4">
-              <TextAreaInput
-                label="Primary operations"
-                value={formData.primary_operations}
-                onChange={(value) => updateField("primary_operations", value)}
-                rows={3}
+          <FormSection title="Premises & Construction">
+            <TextInput
+              label="Location"
+              value={formData.location}
+              onChange={(value) => updateField("location", value)}
+            />
+            <FieldGrid>
+              <TextInput
+                label="Construction Year"
+                value={formData.construction_year}
+                onChange={(value) => updateField("construction_year", value)}
               />
-              <TextAreaInput
-                label="Cover requirements"
-                value={formData.cover_requirements}
-                onChange={(value) => updateField("cover_requirements", value)}
-                rows={3}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Premises and wording notes
-            </h2>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="block text-sm font-medium text-slate-950">
+                  Tenure
+                </span>
+                <select
+                  value={formData.tenure}
+                  className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                  onChange={(event) => updateField("tenure", event.target.value)}
+                >
+                  <option value="">Select</option>
+                  <option value="Rented property">Rented</option>
+                  <option value="Owner-occupied">Owner-occupied</option>
+                  <option value="Leasehold">Leasehold</option>
+                </select>
+              </label>
               <TextInput
                 label="Walls"
                 value={formData.walls}
@@ -363,7 +455,7 @@ export function SubmissionComposerPanel({
                 onChange={(value) => updateField("roof", value)}
               />
               <TextInput
-                label="Floors"
+                label="Floor"
                 value={formData.floors}
                 onChange={(value) => updateField("floors", value)}
               />
@@ -373,163 +465,197 @@ export function SubmissionComposerPanel({
                 onChange={(value) => updateField("heating", value)}
               />
               <TextInput
-                label="Mon to Fri hours"
-                value={formData.business_hours_mon_to_fri}
-                onChange={(value) =>
-                  updateField("business_hours_mon_to_fri", value)
-                }
+                label="Police Station Distance (km)"
+                value={formData.police_distance}
+                onChange={(value) => updateField("police_distance", value)}
               />
               <TextInput
-                label="Sat / Sun hours"
-                value={formData.business_hours_sat_to_sun}
-                onChange={(value) =>
-                  updateField("business_hours_sat_to_sun", value)
-                }
+                label="Fire Station Distance (km)"
+                value={formData.fire_distance}
+                onChange={(value) => updateField("fire_distance", value)}
               />
-            </div>
+            </FieldGrid>
+          </FormSection>
 
-            <div className="mt-4 space-y-4">
-              <TextAreaInput
-                label="Security details"
-                value={formData.security_details}
-                onChange={(value) => updateField("security_details", value)}
-              />
-              <TextAreaInput
-                label="Vehicle storage"
-                value={formData.vehicle_storage}
-                onChange={(value) => updateField("vehicle_storage", value)}
-                rows={3}
-              />
-              <TextAreaInput
-                label="Safety notes"
-                value={formData.safety_notes}
-                onChange={(value) => updateField("safety_notes", value)}
-              />
-              <TextAreaInput
-                label="Customer facilities"
-                value={formData.customer_facilities}
-                onChange={(value) =>
-                  updateField("customer_facilities", value)
-                }
-                rows={3}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Controls
-            </h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <FormSection title="Security & Risk Management">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <CheckboxInput
-                label="Intruder alarm"
+                label="Intruder Alarm"
                 checked={formData.security_alarm}
                 onChange={(checked) => updateField("security_alarm", checked)}
               />
               <CheckboxInput
-                label="CCTV"
+                label="CCTV System"
                 checked={formData.security_cctv}
                 onChange={(checked) => updateField("security_cctv", checked)}
               />
               <CheckboxInput
-                label="Security lighting"
-                checked={formData.security_lighting}
-                onChange={(checked) =>
-                  updateField("security_lighting", checked)
-                }
-              />
-              <CheckboxInput
-                label="Protected openings"
+                label="Roller Shutters"
                 checked={formData.security_shutters}
                 onChange={(checked) =>
                   updateField("security_shutters", checked)
                 }
               />
               <CheckboxInput
-                label="Perimeter protection"
+                label="Security Lighting"
+                checked={formData.security_lighting}
+                onChange={(checked) =>
+                  updateField("security_lighting", checked)
+                }
+              />
+              <CheckboxInput
+                label="Heavy-duty Fencing"
                 checked={formData.security_fencing}
                 onChange={(checked) => updateField("security_fencing", checked)}
               />
               <CheckboxInput
-                label="Ram bars or hoops"
+                label="Ram Bars/Bollards"
                 checked={formData.security_ram_bars}
-                onChange={(checked) => updateField("security_ram_bars", checked)}
+                onChange={(checked) =>
+                  updateField("security_ram_bars", checked)
+                }
               />
+            </div>
+            {hasPrestigeFields ? (
+              <TextInput
+                label="Security Company Name (if applicable)"
+                value={formData.security_company}
+                onChange={(value) => updateField("security_company", value)}
+              />
+            ) : null}
+            <TextAreaInput
+              label="Security Details (additional info)"
+              value={formData.security_details}
+              onChange={(value) => updateField("security_details", value)}
+            />
+            <label className="block">
+              <span className="block text-sm font-medium text-slate-950">
+                Housekeeping Standards
+              </span>
+              <select
+                value={formData.housekeeping}
+                className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                onChange={(event) =>
+                  updateField("housekeeping", event.target.value)
+                }
+              >
+                <option value="Excellent">Excellent</option>
+                <option value="Good">Good</option>
+                <option value="Satisfactory">Satisfactory</option>
+              </select>
+            </label>
+            <TextInput
+              label="Vehicle Storage"
+              value={formData.vehicle_storage}
+              onChange={(value) => updateField("vehicle_storage", value)}
+            />
+          </FormSection>
+
+          <FormSection title="Safety & Compliance">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <CheckboxInput
-                label="IEE certificate"
+                label="Current IEE Certificate"
                 checked={formData.compliance_iee}
                 onChange={(checked) => updateField("compliance_iee", checked)}
               />
               <CheckboxInput
-                label="Health and Safety policy"
+                label="H&S Policy"
                 checked={formData.compliance_health_safety}
                 onChange={(checked) =>
                   updateField("compliance_health_safety", checked)
                 }
               />
               <CheckboxInput
-                label="Accident book"
+                label="Accident Book"
                 checked={formData.compliance_accident_book}
                 onChange={(checked) =>
                   updateField("compliance_accident_book", checked)
                 }
               />
               <CheckboxInput
-                label="Risk assessment"
+                label="Risk Assessment"
                 checked={formData.compliance_risk_assessment}
                 onChange={(checked) =>
                   updateField("compliance_risk_assessment", checked)
                 }
               />
               <CheckboxInput
-                label="Licence checks"
+                label="Driver Licence Checks"
                 checked={formData.compliance_licence_checks}
                 onChange={(checked) =>
                   updateField("compliance_licence_checks", checked)
                 }
               />
               <CheckboxInput
-                label="Excess recovery"
+                label="Excess Recovery Policy"
                 checked={formData.compliance_excess_recovery}
                 onChange={(checked) =>
                   updateField("compliance_excess_recovery", checked)
                 }
               />
-              <CheckboxInput
-                label="Paint spraying"
-                checked={formData.paint_spraying}
-                onChange={(checked) => updateField("paint_spraying", checked)}
-              />
             </div>
+            <TextAreaInput
+              label="Additional Safety Notes"
+              value={formData.safety_notes}
+              onChange={(value) => updateField("safety_notes", value)}
+            />
+            <TextInput
+              label="Customer Facilities"
+              value={formData.customer_facilities}
+              onChange={(value) => updateField("customer_facilities", value)}
+            />
+          </FormSection>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <TextInput
-                label="Welding percentage"
-                value={formData.welding_percentage}
-                onChange={(value) => updateField("welding_percentage", value)}
-              />
-              <TextInput
-                label="Paint spraying percentage"
-                value={formData.paint_spraying_percentage}
-                onChange={(value) =>
-                  updateField("paint_spraying_percentage", value)
-                }
-              />
-            </div>
-          </section>
+          <FormSection title="Opening Hours">
+            <TextInput
+              label="Monday - Friday"
+              value={formData.business_hours_mon_to_fri}
+              onChange={(value) =>
+                updateField("business_hours_mon_to_fri", value)
+              }
+            />
+            <TextInput
+              label="Saturday"
+              value={formData.business_hours_saturday}
+              onChange={(value) => updateField("business_hours_saturday", value)}
+            />
+            <TextInput
+              label="Sunday"
+              value={formData.business_hours_sunday}
+              onChange={(value) => updateField("business_hours_sunday", value)}
+            />
+          </FormSection>
+
+          <FormSection title="Email Details">
+            <TextInput
+              label="Underwriter Name"
+              value={formData.underwriter_name}
+              onChange={(value) => updateField("underwriter_name", value)}
+            />
+            <TextInput
+              label="Target Premium (GBP)"
+              value={formData.target_premium}
+              onChange={(value) => updateField("target_premium", value)}
+            />
+            <TextInput
+              label="Cover Requirements (optional)"
+              value={formData.cover_requirements}
+              onChange={(value) => updateField("cover_requirements", value)}
+            />
+          </FormSection>
         </section>
 
         <section className="space-y-6">
           <OutputCard
-            title="Motor trade combined - additional information"
+            title="Motor Trade Combined - Additional Information"
             text={outputs.motor_trade_additional_information}
           />
           <OutputCard
-            title="Material damage - additional information"
+            title="Material Damage - Additional Information"
             text={outputs.material_damage_additional_information}
           />
           <OutputCard
-            title="Underwriter email"
+            title="Underwriter Email"
             text={outputs.underwriter_email}
           />
         </section>

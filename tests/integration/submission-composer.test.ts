@@ -33,7 +33,7 @@ test("submission composer keeps wording aligned to selected business type", asyn
 
   assert.match(
     carSalesOutputs.motor_trade_additional_information,
-    /well-prepared stock/i,
+    /quality used vehicles/i,
   );
 
   const servicingOutputs = generateSubmissionComposerOutputs({
@@ -43,10 +43,10 @@ test("submission composer keeps wording aligned to selected business type", asyn
 
   assert.match(
     servicingOutputs.motor_trade_additional_information,
-    /servicing, repair work/i,
+    /vehicle servicing, repairs, and MOT testing/i,
   );
   assert.doesNotMatch(
     servicingOutputs.motor_trade_additional_information,
-    /well-prepared stock/i,
+    /quality used vehicles/i,
   );
 });
