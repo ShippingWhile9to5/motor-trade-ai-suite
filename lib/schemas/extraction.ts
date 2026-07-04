@@ -88,6 +88,8 @@ const sumsInsuredAndCoversSchema = z
     fuel_in_tanks: extractionFieldSchema,
     cash_in_safe: extractionFieldSchema,
     number_of_vehicles_in_custody_or_control: extractionFieldSchema,
+    normal_max_vehicle_value: extractionFieldSchema,
+    normal_average_vehicle_value: extractionFieldSchema,
     public_liability_limit: extractionFieldSchema,
     sales_indemnity_limit: extractionFieldSchema,
     employers_liability_required: extractionFieldSchema,

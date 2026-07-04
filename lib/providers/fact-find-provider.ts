@@ -87,6 +87,8 @@ export function createPlaceholderFactFindExtraction(): FactFindExtraction {
       "fuel_in_tanks",
       "cash_in_safe",
       "number_of_vehicles_in_custody_or_control",
+      "normal_max_vehicle_value",
+      "normal_average_vehicle_value",
       "public_liability_limit",
       "sales_indemnity_limit",
       "employers_liability_required",
