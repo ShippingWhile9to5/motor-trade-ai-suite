@@ -1,6 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+function isExtractionFieldShape(value: unknown): value is { value: unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "value" in value &&
+    "confidence" in value &&
+    "is_missing_required" in value
+  );
+}
+
+function fillAllFields(value: unknown): void {
+  if (isExtractionFieldShape(value)) {
+    value.value = "Reviewer provided value";
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach(fillAllFields);
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    Object.values(value).forEach(fillAllFields);
+  }
+}
+
+test("review approval is rejected while required fields are missing", async () => {
+  const { createPlaceholderFactFindExtraction } = require(
+    "../../lib/providers/fact-find-provider",
+  ) as typeof import(
+    "../../lib/providers/fact-find-provider"
+  );
+  const { createReviewWorkflow } = require(
+    "../../lib/services/reviews",
+  ) as typeof import("../../lib/services/reviews");
+
+  await assert.rejects(
+    createReviewWorkflow({
+      extraction_id: crypto.randomUUID(),
+      reviewer_user_id: "user_test_123",
+      reviewed_output: createPlaceholderFactFindExtraction(),
+      review_status: "approved",
+      reviewed_at: new Date().toISOString(),
+    }),
+    /required fields are missing/,
+  );
+});
+
 test("placeholder submission pipeline runs through persistence", async () => {
   const { createPlaceholderFactFindExtraction } = require(
     "../../lib/providers/fact-find-provider",
@@ -30,6 +78,7 @@ test("placeholder submission pipeline runs through persistence", async () => {
   const caseId = crypto.randomUUID();
   const extractionId = crypto.randomUUID();
   const reviewedOutput = createPlaceholderFactFindExtraction();
+  fillAllFields(reviewedOutput);
 
   await createReviewWorkflow({
     extraction_id: extractionId,

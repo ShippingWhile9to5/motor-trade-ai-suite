@@ -54,6 +54,22 @@ function isExtractionField(value: unknown): value is ExtractionField {
   return extractionFieldSchema.safeParse(value).success;
 }
 
+export function isMissingRequiredField(field: ExtractionField) {
+  if (!field.is_missing_required) {
+    return false;
+  }
+
+  if (typeof field.value === "string") {
+    return field.value.trim() === "";
+  }
+
+  if (Array.isArray(field.value)) {
+    return field.value.length === 0;
+  }
+
+  return false;
+}
+
 function toLabel(path: string) {
   return path
     .split(".")
@@ -63,7 +79,7 @@ function toLabel(path: string) {
 
 function collectMissingFields(value: unknown, path: string): MissingField[] {
   if (isExtractionField(value)) {
-    if (!value.is_missing_required) {
+    if (!isMissingRequiredField(value)) {
       return [];
     }
 

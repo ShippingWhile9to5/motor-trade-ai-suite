@@ -11,6 +11,7 @@ import type {
   FactFindExtraction,
 } from "../../../../lib/schemas/extraction";
 import type { ExtractionReview } from "../../../../lib/schemas/review";
+import { isMissingRequiredField } from "../../../../lib/validation/extraction";
 
 type ReviewPanelProps = {
   caseId: string;
@@ -147,6 +148,19 @@ export function ReviewPanel({
       return;
     }
 
+    if (reviewStatus === "approved") {
+      const missingCount = collectFields(reviewedOutput).filter(({ field }) =>
+        isMissingRequiredField(field),
+      ).length;
+
+      if (missingCount > 0) {
+        setError(
+          `Cannot approve: ${missingCount} required field${missingCount === 1 ? " is" : "s are"} still missing a value. Fill them in or mark the review as needing changes.`,
+        );
+        return;
+      }
+    }
+
     startTransition(async () => {
       const input = {
         case_id: caseId,
@@ -220,51 +234,53 @@ export function ReviewPanel({
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {rows.map(({ path, label, field }) => (
-                    <div
-                      key={path.join(".")}
-                      className={`rounded-md border px-4 py-3 ${
-                        field.is_missing_required
-                          ? "border-red-300 bg-red-50"
-                          : field.requires_review
-                            ? "border-amber-200 bg-amber-50"
-                            : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <label className="block text-sm font-medium text-slate-950">
-                        {label}
-                      </label>
-                      <input
-                        type="text"
-                        value={valueToText(field.value)}
-                        className={`mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 ${
-                          field.is_missing_required
-                            ? "border-red-300"
-                            : "border-slate-300"
+                  {rows.map(({ path, label, field }) => {
+                    const isMissing = isMissingRequiredField(field);
+
+                    return (
+                      <div
+                        key={path.join(".")}
+                        className={`rounded-md border px-4 py-3 ${
+                          isMissing
+                            ? "border-red-300 bg-red-50"
+                            : field.requires_review
+                              ? "border-amber-200 bg-amber-50"
+                              : "border-slate-200 bg-white"
                         }`}
-                        onChange={(event) =>
-                          handleValueChange(path, event.target.value)
-                        }
-                      />
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-                          Confidence {Math.round(field.confidence * 100)}%
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-                          Requires review {field.requires_review ? "yes" : "no"}
-                        </span>
-                        {field.is_missing_required ? (
-                          <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-700">
-                            Missing required
-                          </span>
-                        ) : (
+                      >
+                        <label className="block text-sm font-medium text-slate-950">
+                          {label}
+                        </label>
+                        <input
+                          type="text"
+                          value={valueToText(field.value)}
+                          className={`mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 ${
+                            isMissing ? "border-red-300" : "border-slate-300"
+                          }`}
+                          onChange={(event) =>
+                            handleValueChange(path, event.target.value)
+                          }
+                        />
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
                           <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-                            Required value present
+                            Confidence {Math.round(field.confidence * 100)}%
                           </span>
-                        )}
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
+                            Requires review {field.requires_review ? "yes" : "no"}
+                          </span>
+                          {isMissing ? (
+                            <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-700">
+                              Missing required
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
+                              Required value present
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>

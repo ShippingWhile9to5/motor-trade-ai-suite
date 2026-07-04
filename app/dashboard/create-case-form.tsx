@@ -23,11 +23,11 @@ export function CreateCaseForm() {
 
     startTransition(async () => {
       try {
-        await createCaseAction({
+        const createdCase = await createCaseAction({
           client_name: trimmedClientName,
         });
         setClientName("");
-        router.refresh();
+        router.push(`/dashboard/cases/${createdCase.id}`);
       } catch {
         setError("Case could not be created.");
       }
