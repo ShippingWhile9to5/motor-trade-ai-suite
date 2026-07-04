@@ -193,99 +193,6 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
 
       <WorkflowProgress steps={workflowSteps} />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Case metadata
-          </h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-slate-500">Client</dt>
-              <dd className="truncate font-medium text-slate-950">
-                {caseRecord.client_name}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-slate-500">Status</dt>
-              <dd className="font-medium text-slate-950">{caseRecord.status}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Extraction
-          </h2>
-          <div className="mt-4 space-y-2">
-            <StatusValue>{extraction?.status ?? "not_started"}</StatusValue>
-            <p className="text-sm text-slate-600">
-              {extraction
-                ? `Last updated ${formatDate(extraction.updated_at)}.`
-                : hasDocuments
-                  ? "No extraction result yet. Run extraction when ready."
-                  : "Upload a document before running extraction."}
-            </p>
-          </div>
-          <ExtractionTrigger
-            caseId={caseRecord.id}
-            documentReferenceId={documents[0]?.id}
-            extractionStatus={hasExtraction ? extraction?.status : undefined}
-          />
-        </section>
-
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Review
-          </h2>
-          <div className="mt-4 space-y-2">
-            <StatusValue>{review?.review_status ?? "not_started"}</StatusValue>
-            <p className="text-sm text-slate-600">
-              {review?.reviewed_at
-                ? `Reviewed ${formatDate(review.reviewed_at)}.`
-                : hasExtraction
-                  ? "Extraction is available for review."
-                  : "No review available until extraction has run."}
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Submission
-          </h2>
-          <div className="mt-4 space-y-2">
-            <StatusValue>{submission?.submission_status ?? "not_started"}</StatusValue>
-            <p className="text-sm text-slate-600">
-              {submission
-                ? `Created ${formatDate(submission.created_at)}.`
-                : hasApprovedReview
-                  ? "Approved review is ready for submission generation."
-                  : "No submission draft until review is approved."}
-            </p>
-            <Link
-              href={`/dashboard/cases/${caseRecord.id}/submission-composer`}
-              className="inline-flex min-h-11 items-center text-sm font-medium text-sky-700 hover:text-sky-900"
-            >
-              Open submission composer
-            </Link>
-          </div>
-        </section>
-      </div>
-
-      <ReviewPanel
-        caseId={caseRecord.id}
-        extractionId={extraction?.id}
-        extractionOutput={extraction?.raw_result_json ?? null}
-        review={review}
-      />
-
-      <SubmissionPanel
-        caseId={caseRecord.id}
-        extractionId={extraction?.id}
-        reviewStatus={review?.review_status}
-        submission={submission}
-      />
-
       <CaseUploadSection caseId={caseRecord.id} />
 
       <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
@@ -326,6 +233,105 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           </ul>
         )}
       </section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Case metadata
+          </h2>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-slate-500">Client</dt>
+              <dd className="truncate font-medium text-slate-950">
+                {caseRecord.client_name}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-slate-500">Status</dt>
+              <dd className="font-medium text-slate-950">{caseRecord.status}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Extraction
+          </h2>
+          <div className="mt-4 space-y-2">
+            <StatusValue>{extraction?.status ?? "not_started"}</StatusValue>
+            <p className="text-sm text-slate-600">
+              {extraction
+                ? `Last updated ${formatDate(extraction.updated_at)}.`
+                : hasDocuments
+                  ? "No extraction result yet. Run extraction when ready."
+                  : "Upload a document before running extraction."}
+            </p>
+          </div>
+          <ExtractionTrigger
+            caseId={caseRecord.id}
+            documentReferenceId={documents[0]?.id}
+            extractionStatus={hasExtraction ? extraction?.status : undefined}
+          />
+        </section>
+
+        {hasExtraction ? (
+          <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Review
+            </h2>
+            <div className="mt-4 space-y-2">
+              <StatusValue>{review?.review_status ?? "not_started"}</StatusValue>
+              <p className="text-sm text-slate-600">
+                {review?.reviewed_at
+                  ? `Reviewed ${formatDate(review.reviewed_at)}.`
+                  : "Extraction is available for review."}
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        {hasExtraction ? (
+          <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Submission
+            </h2>
+            <div className="mt-4 space-y-2">
+              <StatusValue>{submission?.submission_status ?? "not_started"}</StatusValue>
+              <p className="text-sm text-slate-600">
+                {submission
+                  ? `Created ${formatDate(submission.created_at)}.`
+                  : hasApprovedReview
+                    ? "Approved review is ready for submission generation."
+                    : "No submission draft until review is approved."}
+              </p>
+              <Link
+                href={`/dashboard/cases/${caseRecord.id}/submission-composer`}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-sky-700 hover:text-sky-900"
+              >
+                Open submission composer
+              </Link>
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      {hasExtraction ? (
+        <ReviewPanel
+          caseId={caseRecord.id}
+          extractionId={extraction?.id}
+          extractionOutput={extraction?.raw_result_json ?? null}
+          review={review}
+        />
+      ) : null}
+
+      {hasExtraction ? (
+        <SubmissionPanel
+          caseId={caseRecord.id}
+          extractionId={extraction?.id}
+          reviewStatus={review?.review_status}
+          submission={submission}
+        />
+      ) : null}
     </section>
   );
 }
