@@ -10,8 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@clerk/nextjs": "^7.4.1",
     "@supabase/supabase-js": "^2.106.1",
+    "heic-convert": "^2.1.0",
     "next": "^15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -19,6 +21,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/heic-convert": "^2.1.1",
     "@types/node": "^22.15.21",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",

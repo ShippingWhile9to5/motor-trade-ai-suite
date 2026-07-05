@@ -7,7 +7,6 @@ import { getExtractionAction } from "../../../actions/extractions";
 import { getReviewAction } from "../../../actions/reviews";
 import { getSubmissionAction } from "../../../actions/submissions";
 import { CaseUploadSection } from "./case-upload-section";
-import { ExtractionTrigger } from "./extraction-trigger";
 import { ReviewPanel } from "./review-panel";
 import { SubmissionPanel } from "./submission-panel";
 
@@ -261,17 +260,10 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             <StatusValue>{extraction?.status ?? "not_started"}</StatusValue>
             <p className="text-sm text-slate-600">
               {extraction
-                ? `Last updated ${formatDate(extraction.updated_at)}.`
-                : hasDocuments
-                  ? "No extraction result yet. Run extraction when ready."
-                  : "Upload a document before running extraction."}
+                ? `Extracted ${formatDate(extraction.updated_at)}. Review the fields below.`
+                : "Upload a fact-find above to extract its fields automatically."}
             </p>
           </div>
-          <ExtractionTrigger
-            caseId={caseRecord.id}
-            documentReferenceId={documents[0]?.id}
-            extractionStatus={hasExtraction ? extraction?.status : undefined}
-          />
         </section>
 
         {hasExtraction ? (

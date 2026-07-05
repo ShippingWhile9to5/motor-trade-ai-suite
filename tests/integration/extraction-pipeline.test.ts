@@ -107,7 +107,7 @@ test("placeholder extraction pipeline runs through persistence", async () => {
   const { getDocumentReferenceWorkflow } = require(
     "../../lib/services/storage",
   ) as typeof import("../../lib/services/storage");
-  const { executeExtractionWorkflow } = require(
+  const { runFactFindExtractionWorkflow } = require(
     "../../lib/services/extraction-execution",
   ) as typeof import(
     "../../lib/services/extraction-execution"
@@ -144,11 +144,13 @@ test("placeholder extraction pipeline runs through persistence", async () => {
     documentReference,
   );
 
-  const result = await executeExtractionWorkflow(
+  const result = await runFactFindExtractionWorkflow(
     {
-      document_reference_id: documentReference.id,
+      case_id: caseId,
+      document_id: documentReference.id,
       user_id: userId,
     },
+    [],
     factFindProvider,
   );
 

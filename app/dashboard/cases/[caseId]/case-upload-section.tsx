@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { uploadCaseDocumentsAction } from "../../../actions/documents";
+import { uploadAndExtractCaseDocumentsAction } from "../../../actions/documents";
 import { FileUpload } from "../../../components/file-upload";
 
 type CaseUploadSectionProps = {
@@ -30,14 +30,16 @@ export function CaseUploadSection({ caseId }: CaseUploadSectionProps) {
     files.forEach((file) => formData.append("files", file));
 
     startTransition(async () => {
-      const result = await uploadCaseDocumentsAction(formData);
+      const result = await uploadAndExtractCaseDocumentsAction(formData);
 
       if (!result.success) {
         setErrors(result.errors);
         return;
       }
 
-      setMessage(`${result.references.length} file reference saved.`);
+      setMessage(
+        `${result.references.length} page${result.references.length === 1 ? "" : "s"} extracted. Review the fields below.`,
+      );
       setFiles([]);
       router.refresh();
     });
@@ -47,10 +49,12 @@ export function CaseUploadSection({ caseId }: CaseUploadSectionProps) {
     <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <div className="mb-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Upload documents
+          Upload &amp; extract fact-find
         </h2>
         <p className="mt-2 text-sm text-slate-600">
-          Select fact-find PDFs or photos from your device.
+          Select the fact-find PDF or photos. The document is sent for AI
+          extraction and is not stored — only the extracted data is kept for
+          your review.
         </p>
       </div>
 
@@ -79,7 +83,7 @@ export function CaseUploadSection({ caseId }: CaseUploadSectionProps) {
         disabled={isPending || files.length === 0}
         onClick={handleUpload}
       >
-        {isPending ? "Saving..." : "Save document references"}
+        {isPending ? "Extracting..." : "Upload & extract fact-find"}
       </button>
     </section>
   );
