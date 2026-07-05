@@ -12,12 +12,12 @@ import {
 
 // Confidence below this is surfaced to the reviewer as "needs a look" (amber).
 const REVIEW_CONFIDENCE_THRESHOLD = 0.85;
-const EXTRACTION_MODEL = "claude-opus-4-8";
+const EXTRACTION_MODEL = "claude-sonnet-5";
 
 // Single source of truth for the fact-find field layout. Keys must match
 // lib/schemas/extraction.ts exactly — the final factFindExtractionSchema.parse()
 // is the guard that catches any drift.
-const SCALAR_SECTIONS = {
+export const SCALAR_SECTIONS = {
   company_details: [
     "proposer",
     "company_name",
@@ -158,7 +158,7 @@ const SCALAR_SECTIONS = {
   ],
 } as const;
 
-const ROW_SECTIONS = {
+export const ROW_SECTIONS = {
   driver_details: [
     "driver_name",
     "driver_occupation",
