@@ -56,3 +56,39 @@ export async function createExtractionResultWorkflow(input: unknown) {
     missing_required_fields: missingFields.missing_required_fields,
   };
 }
+
+export const createExtractionFailureWorkflowInputSchema = z
+  .object({
+    case_id: z.string().uuid(),
+    document_id: z.string().uuid(),
+    user_id: z.string().min(1),
+    error_message: z.string().min(1),
+  })
+  .strict();
+
+// A failed attempt must be persisted with its own status/error_message,
+// otherwise a failed case is indistinguishable from one where extraction was
+// never attempted at all.
+export async function createExtractionFailureWorkflow(input: unknown) {
+  const data = createExtractionFailureWorkflowInputSchema.parse(input);
+
+  const existingExtraction = await getExtractionByCaseIdWorkflow({
+    case_id: data.case_id,
+    user_id: data.user_id,
+  });
+
+  return existingExtraction
+    ? updateExtractionWorkflow({
+        id: existingExtraction.id,
+        user_id: data.user_id,
+        status: "failed",
+        error_message: data.error_message,
+      })
+    : createExtractionWorkflow({
+        case_id: data.case_id,
+        document_id: data.document_id,
+        user_id: data.user_id,
+        status: "failed",
+        error_message: data.error_message,
+      });
+}

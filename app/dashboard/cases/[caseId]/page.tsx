@@ -52,6 +52,7 @@ function WorkflowProgress({
     detail: string;
     isComplete: boolean;
     isCurrent: boolean;
+    isError?: boolean;
   }>;
 }) {
   return (
@@ -64,21 +65,25 @@ function WorkflowProgress({
           <div
             key={step.label}
             className={`rounded-md border px-4 py-3 ${
-              step.isComplete
-                ? "border-emerald-200 bg-emerald-50"
-                : step.isCurrent
-                  ? "border-sky-200 bg-sky-50"
-                  : "border-slate-200 bg-slate-50"
+              step.isError
+                ? "border-red-200 bg-red-50"
+                : step.isComplete
+                  ? "border-emerald-200 bg-emerald-50"
+                  : step.isCurrent
+                    ? "border-sky-200 bg-sky-50"
+                    : "border-slate-200 bg-slate-50"
             }`}
           >
             <div className="flex items-center gap-3">
               <span
                 className={`h-3 w-3 shrink-0 rounded-full ${
-                  step.isComplete
-                    ? "bg-emerald-500"
-                    : step.isCurrent
-                      ? "bg-sky-500"
-                      : "bg-slate-300"
+                  step.isError
+                    ? "bg-red-500"
+                    : step.isComplete
+                      ? "bg-emerald-500"
+                      : step.isCurrent
+                        ? "bg-sky-500"
+                        : "bg-slate-300"
                 }`}
               />
               <p className="text-sm font-medium text-slate-950">{step.label}</p>
@@ -131,6 +136,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     : null;
   const hasDocuments = documents.length > 0;
   const hasExtraction = Boolean(extraction?.raw_result_json);
+  const hasFailedExtraction = extraction?.status === "failed";
   const hasApprovedReview = review?.review_status === "approved";
   const isSubmissionReady =
     submission?.submission_status === "ready" ||
@@ -146,14 +152,16 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     },
     {
       label: "Extracted",
-      detail:
-        hasExtraction
-          ? extraction?.status ?? "review_required"
+      detail: hasExtraction
+        ? extraction?.status ?? "review_required"
+        : hasFailedExtraction
+          ? `Failed - ${extraction?.error_message ?? "unknown error"}`
           : hasDocuments
             ? "Ready to run"
             : "Waiting for upload",
       isComplete: hasExtraction,
-      isCurrent: hasDocuments && !hasExtraction,
+      isCurrent: hasDocuments && !hasExtraction && !hasFailedExtraction,
+      isError: hasFailedExtraction,
     },
     {
       label: "Reviewed",
@@ -263,9 +271,11 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <div className="mt-4 space-y-2">
             <StatusValue>{extraction?.status ?? "not_started"}</StatusValue>
             <p className="text-sm text-slate-600">
-              {extraction
-                ? `Extracted ${formatDate(extraction.updated_at)}. Review the fields below.`
-                : "Upload a fact-find above to extract its fields automatically."}
+              {hasFailedExtraction
+                ? `Extraction failed: ${extraction?.error_message ?? "unknown error"}. Choose the files again above and retry.`
+                : extraction
+                  ? `Extracted ${formatDate(extraction.updated_at)}. Review the fields below.`
+                  : "Upload a fact-find above to extract its fields automatically."}
             </p>
           </div>
         </section>

@@ -5,7 +5,10 @@ import type {
   ExtractionProvider,
   ExtractionSourceFile,
 } from "../providers/extraction";
-import { createExtractionResultWorkflow } from "./extraction-orchestrator";
+import {
+  createExtractionFailureWorkflow,
+  createExtractionResultWorkflow,
+} from "./extraction-orchestrator";
 
 export const runFactFindExtractionWorkflowInputSchema = z
   .object({
@@ -26,7 +29,20 @@ export async function runFactFindExtractionWorkflow(
   provider: ExtractionProvider,
 ) {
   const data = runFactFindExtractionWorkflowInputSchema.parse(input);
-  const extractionPayload = await provider.extract(files);
+
+  let extractionPayload;
+  try {
+    extractionPayload = await provider.extract(files);
+  } catch (error) {
+    await createExtractionFailureWorkflow({
+      case_id: data.case_id,
+      document_id: data.document_id,
+      user_id: data.user_id,
+      error_message:
+        error instanceof Error ? error.message : "Extraction failed.",
+    });
+    throw error;
+  }
 
   return createExtractionResultWorkflow({
     case_id: data.case_id,

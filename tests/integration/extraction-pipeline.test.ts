@@ -192,3 +192,59 @@ test("placeholder extraction pipeline runs through persistence", async () => {
   assert.deepEqual(persisted, result.extraction);
   assert.equal(extractionRows.length, 1);
 });
+
+test("a provider failure is persisted as a failed extraction, not silently dropped", async () => {
+  const { createDocumentReferenceWorkflow } = require(
+    "../../lib/services/storage",
+  ) as typeof import("../../lib/services/storage");
+  const { runFactFindExtractionWorkflow } = require(
+    "../../lib/services/extraction-execution",
+  ) as typeof import(
+    "../../lib/services/extraction-execution"
+  );
+  const { getExtractionByCaseIdWorkflow } = require(
+    "../../lib/services/extractions",
+  ) as typeof import(
+    "../../lib/services/extractions"
+  );
+
+  const caseId = crypto.randomUUID();
+  const userId = "user_test_123";
+  const documentReference = await createDocumentReferenceWorkflow({
+    case_id: caseId,
+    user_id: userId,
+    file_name: "fact-find.pdf",
+    file_type: "application/pdf",
+    file_size: 1024,
+    storage_path: `cases/${caseId}/fact-find.pdf`,
+  });
+
+  const failingProvider = {
+    extract: async () => {
+      throw new Error("Claude request timed out");
+    },
+  };
+
+  await assert.rejects(
+    runFactFindExtractionWorkflow(
+      {
+        case_id: caseId,
+        document_id: documentReference.id,
+        user_id: userId,
+      },
+      [],
+      failingProvider,
+    ),
+    /Claude request timed out/,
+  );
+
+  const persisted = await getExtractionByCaseIdWorkflow({
+    case_id: caseId,
+    user_id: userId,
+  });
+
+  assert.ok(persisted);
+  assert.equal(persisted?.status, "failed");
+  assert.equal(persisted?.error_message, "Claude request timed out");
+  assert.equal(persisted?.raw_result_json, null);
+});
