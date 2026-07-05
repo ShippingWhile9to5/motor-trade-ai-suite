@@ -30,18 +30,27 @@ export function CaseUploadSection({ caseId }: CaseUploadSectionProps) {
     files.forEach((file) => formData.append("files", file));
 
     startTransition(async () => {
-      const result = await uploadAndExtractCaseDocumentsAction(formData);
+      try {
+        const result = await uploadAndExtractCaseDocumentsAction(formData);
 
-      if (!result.success) {
-        setErrors(result.errors);
-        return;
+        if (!result.success) {
+          setErrors(result.errors);
+          return;
+        }
+
+        setMessage(
+          `${result.references.length} page${result.references.length === 1 ? "" : "s"} extracted. Review the fields below.`,
+        );
+        setFiles([]);
+        router.refresh();
+      } catch {
+        // A framework-level failure (request too large, timeout, network drop)
+        // rejects before the action returns a result. Keep it on this page
+        // instead of bubbling into the route error boundary.
+        setErrors([
+          "Upload or extraction failed before completing. Check your connection and try again; if it keeps happening, try fewer or smaller pages.",
+        ]);
       }
-
-      setMessage(
-        `${result.references.length} page${result.references.length === 1 ? "" : "s"} extracted. Review the fields below.`,
-      );
-      setFiles([]);
-      router.refresh();
     });
   }
 
