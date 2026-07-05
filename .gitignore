@@ -6,3 +6,4 @@ dist
 .test-build
 *.tsbuildinfo
 .env*.local
+.claude/settings.local.json
