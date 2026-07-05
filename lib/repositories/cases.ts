@@ -108,6 +108,22 @@ export async function deleteCase(input: unknown): Promise<Case | null> {
   return row ? parseCaseRow(row) : null;
 }
 
+export async function deleteCasesUpdatedBefore(
+  cutoffIso: string,
+): Promise<number> {
+  // System-wide retention purge (no user filter). The `on delete cascade`
+  // foreign keys remove the documents/extractions/reviews/submissions rows.
+  const { data, error } = await supabase
+    .from("cases")
+    .delete()
+    .lt("updated_at", cutoffIso)
+    .select("id");
+
+  throwSupabaseError(error);
+
+  return data?.length ?? 0;
+}
+
 export async function updateCase(input: unknown): Promise<Case | null> {
   const data = updateCaseInputSchema.parse(input);
   const { id, user_id, ...updates } = data;
