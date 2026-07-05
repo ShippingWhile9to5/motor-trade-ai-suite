@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { installFakeSupabase, store } from "./helpers/fake-supabase";
+
+installFakeSupabase();
 
 function isExtractionFieldShape(value: unknown): value is { value: unknown } {
   return (
@@ -79,6 +82,10 @@ test("placeholder submission pipeline runs through persistence", async () => {
   const extractionId = crypto.randomUUID();
   const reviewedOutput = createPlaceholderFactFindExtraction();
   fillAllFields(reviewedOutput);
+
+  // The reviews repository looks up the extraction's case_id when creating
+  // a review row, mirroring the real foreign-key relationship.
+  store.extractions = [{ id: extractionId, case_id: caseId }];
 
   await createReviewWorkflow({
     extraction_id: extractionId,

@@ -72,12 +72,29 @@ export default async function SubmissionComposerPage({
     );
   }
 
-  const initialInput = deriveSubmissionComposerInput(approvedOutput);
+  // A previously saved composer state takes priority over deriving fresh
+  // from the extraction, so re-opening the composer doesn't discard edits.
+  const initialInput = submission?.composer_input ??
+    deriveSubmissionComposerInput(approvedOutput);
+  const initialOutputs =
+    submission?.motor_trade_additional_information != null &&
+    submission?.material_damage_additional_information != null &&
+    submission?.underwriter_email != null
+      ? {
+          motor_trade_additional_information:
+            submission.motor_trade_additional_information,
+          material_damage_additional_information:
+            submission.material_damage_additional_information,
+          underwriter_email: submission.underwriter_email,
+        }
+      : null;
 
   return (
     <SubmissionComposerPanel
       caseId={caseRecord.id}
+      extractionId={extraction!.id}
       initialInput={initialInput}
+      initialOutputs={initialOutputs}
       submissionStatus={submission?.submission_status}
     />
   );

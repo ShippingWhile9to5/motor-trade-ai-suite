@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const submissionComposerBusinessTypeSchema = z.enum([
+  "servicing_and_repair",
   "mot_servicing",
   "bodyshop",
   "car_sales",

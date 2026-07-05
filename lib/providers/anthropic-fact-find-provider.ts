@@ -117,10 +117,8 @@ export const SCALAR_SECTIONS = {
     "loan_and_hire_required",
     "accompanied_demonstration",
     "unaccompanied_demonstration",
-    "number_of_trade_plates",
-    "trade_plate_details",
-    "recovery_work",
-    "recovery_work_percentage",
+    "number_of_trade_plates_including_details",
+    "recovery_work_including_percentage",
     "windscreen_cover",
   ],
   existing_cover_and_notes: [
@@ -166,14 +164,7 @@ export const ROW_SECTIONS = {
     "driver_accidents_convictions",
     "driver_vehicle_usage",
   ],
-  vehicle_details: [
-    "vehicle_make_and_model",
-    "vehicle_year",
-    "vehicle_value",
-    "vehicle_registration",
-    "vehicle_use",
-    "vehicle_owner",
-  ],
+  vehicle_details: ["vehicle_registration", "vehicle_value"],
   claims_history: ["claim_date", "claim_details", "claim_amount", "claim_settled"],
 } as const;
 
@@ -259,7 +250,7 @@ Rules:
 - For tick-box / checkbox items, use "yes" for a tick/check and "no" for a cross (X), plus any adjacent note (e.g. a ticked Intruder Alarm annotated "bells only" -> value "yes - bells only").
 - If a field is blank on the form, return an empty string "" with confidence 0. Never invent a value.
 - confidence is 0..1 reflecting how sure you are of the transcription for that field (legibility + certainty). Low for hard-to-read handwriting.
-- The broker often writes answers OUTSIDE the printed boxes (in margins, at the bottom, squeezed between rows). Treat ALL handwriting on the page as data. First try to place stray handwriting into the field it logically belongs to (e.g. an extra "REG - VALUE" pair written at the bottom is another vehicle row; add it to vehicle_details). Only if you cannot confidently place a note should it go into unmapped_notes (verbatim).
+- The broker often writes answers OUTSIDE the printed boxes (in margins, at the bottom, squeezed between rows). Treat ALL handwriting on the page as data. First try to place stray handwriting into the field it logically belongs to. In particular: vehicle_details only needs a registration and a value — if you see ANY extra "REGISTRATION - VALUE" pair anywhere on the page (margins, footnotes, between other rows), you MUST add it as its own row in vehicle_details, even if it is also mentioned in a note elsewhere. Only if a piece of handwriting truly cannot be placed into any field should it go into unmapped_notes (verbatim).
 - Broker instructions to themselves (e.g. "doesn't need to be on if too expensive") are not field data — put them in broker_notes verbatim.
 - driver_details, vehicle_details and claims_history are variable-length: return one object per row that has any content; omit empty rows.
 - Inline annotations next to a field (e.g. "keys taken home" beside the key-cabinet declaration) belong in that field's value.`;

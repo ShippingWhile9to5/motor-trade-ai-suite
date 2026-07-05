@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { requireUser } from "../../lib/auth";
 import { factFindSubmissionProvider } from "../../lib/providers/fact-find-submission-provider";
+import { submissionComposerInputSchema } from "../../lib/schemas/submission-composer";
 import { submissionStatusSchema } from "../../lib/schemas/submission";
 import { getCaseWorkflow } from "../../lib/services/cases";
 import { getExtractionByCaseIdWorkflow } from "../../lib/services/extractions";
@@ -10,6 +11,7 @@ import { getReviewByExtractionIdWorkflow } from "../../lib/services/reviews";
 import { generateSubmissionFromApprovedReview } from "../../lib/services/submission-orchestrator";
 import {
   getSubmissionByCaseIdWorkflow,
+  saveSubmissionComposerStateWorkflow,
   updateSubmissionWorkflow,
 } from "../../lib/services/submissions";
 
@@ -124,6 +126,41 @@ export async function updateSubmissionAction(input: unknown) {
       ? { submission_status: data.submission_status }
       : {}),
   });
+}
+
+const saveSubmissionComposerStateActionInputSchema = ownedReviewInputSchema.extend({
+  composer_input: submissionComposerInputSchema,
+  motor_trade_additional_information: z.string(),
+  material_damage_additional_information: z.string(),
+  underwriter_email: z.string(),
+});
+
+export async function saveSubmissionComposerStateAction(input: unknown) {
+  const user = await requireUser();
+  const data = saveSubmissionComposerStateActionInputSchema.parse(input);
+  const ownedReview = await getOwnedApprovedReview(data, user.userId);
+
+  if (!ownedReview) {
+    return {
+      success: false as const,
+      error: "Approved review not found.",
+    };
+  }
+
+  const submission = await saveSubmissionComposerStateWorkflow({
+    case_id: ownedReview.case_id,
+    review_id: ownedReview.extraction_id,
+    composer_input: data.composer_input,
+    motor_trade_additional_information: data.motor_trade_additional_information,
+    material_damage_additional_information:
+      data.material_damage_additional_information,
+    underwriter_email: data.underwriter_email,
+  });
+
+  return {
+    success: true as const,
+    submission,
+  };
 }
 
 export async function getSubmissionAction(input: unknown) {

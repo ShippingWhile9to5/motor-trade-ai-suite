@@ -133,6 +133,7 @@ function inferBusinessType(
   const hasBodywork = isAffirmative(
     fieldToText(extraction.business_activities.bodywork),
   );
+  const hasMot = isAffirmative(fieldToText(extraction.business_activities.mot));
 
   if (hasSales && (hasService || hasBodywork)) {
     return "combined";
@@ -146,7 +147,7 @@ function inferBusinessType(
     return "car_sales";
   }
 
-  return "mot_servicing";
+  return hasMot ? "mot_servicing" : "servicing_and_repair";
 }
 
 function inferStockProfile(
@@ -230,6 +231,7 @@ function getBusinessEthos(input: SubmissionComposerInput) {
     case "combined":
       return `${ethos} and a commitment to delivering five-star standard repairs while also presenting quality vehicles for sale. The business is well-regarded in the local area and maintains high standards across all aspects of its operation.`;
     case "mot_servicing":
+    case "servicing_and_repair":
     default:
       return `${ethos} and a commitment to delivering five-star standard repairs and maintenance. The business is well-regarded in the local area and maintains high standards across all aspects of its workshop operations. They benefit from a loyal returning customer base built on trust and reliability.`;
   }
@@ -253,6 +255,8 @@ function getExperienceDescription(input: SubmissionComposerInput) {
       return `${name} brings over ${experience} of experience in the motor trade industry, specialising in bodywork, accident repair, and paint spraying operations.`;
     case "combined":
       return `${name} brings over ${experience} of experience in the motor trade industry, specialising in ${primaryOperations.toLowerCase()}.`;
+    case "servicing_and_repair":
+      return `${name} brings over ${experience} of experience in the motor trade industry, specialising in vehicle servicing and repairs.`;
     case "mot_servicing":
     default:
       return `${name} brings over ${experience} of experience in the motor trade industry, specialising in vehicle servicing, repairs, and MOT testing.`;
@@ -390,8 +394,12 @@ export function deriveSubmissionComposerInput(
     ),
     business_hours_saturday: weekendHours.saturday,
     business_hours_sunday: weekendHours.sunday,
-    average_vehicle_value: "",
-    maximum_vehicle_value: "",
+    average_vehicle_value: fieldToText(
+      extraction.sums_insured_and_covers.normal_average_vehicle_value,
+    ),
+    maximum_vehicle_value: fieldToText(
+      extraction.sums_insured_and_covers.normal_max_vehicle_value,
+    ),
     maximum_used_car_value: "",
     underwriter_name: "",
     target_premium: fieldToText(
@@ -668,7 +676,10 @@ export function generateSubmissionComposerOutputs(
   let intro: string;
   if (data.business_type === "car_sales" && data.stock_profile === "prestige") {
     intro = `I'd like to present a well-established motor trade risk for quotation - ${businessName}, a well-known and reputable used prestige car sales business based in one of the nicest parts of ${data.location.includes(",") ? data.location.split(",").slice(-1)[0].trim() : "the area"}. It is based on ${data.location}. Below is a detailed summary of the risk to assist with underwriting.`;
-  } else if (data.business_type === "mot_servicing") {
+  } else if (
+    data.business_type === "mot_servicing" ||
+    data.business_type === "servicing_and_repair"
+  ) {
     intro = `I'd like to present a well-established motor trade risk for quotation - ${businessName}, a reputable vehicle servicing and repair specialist based in ${data.location}. Below is a detailed summary of the risk to assist with underwriting.`;
   } else if (data.business_type === "bodyshop") {
     intro = `I'd like to present a well-established motor trade risk for quotation - ${businessName}, a professional bodyshop specialising in accident repair based in ${data.location}. Below is a detailed summary of the risk to assist with underwriting.`;

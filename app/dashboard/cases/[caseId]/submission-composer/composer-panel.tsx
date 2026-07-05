@@ -1,24 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { saveSubmissionComposerStateAction } from "../../../../actions/submissions";
 import { generateSubmissionComposerOutputs } from "../../../../../lib/submission-composer";
 import type {
   SubmissionComposerBusinessType,
   SubmissionComposerInput,
+  SubmissionComposerOutputs,
   SubmissionComposerStockProfile,
 } from "../../../../../lib/schemas/submission-composer";
 import type { SubmissionStatus } from "../../../../../lib/schemas/submission";
 
 type ComposerPanelProps = {
   caseId: string;
+  extractionId: string;
   initialInput: SubmissionComposerInput;
+  initialOutputs: SubmissionComposerOutputs | null;
   submissionStatus?: SubmissionStatus;
 };
 
 type CopyState = "idle" | "copied" | "failed";
 
+type SaveState = "idle" | "saving" | "saved" | "failed";
+
 const businessTypeLabels: Record<SubmissionComposerBusinessType, string> = {
+  servicing_and_repair: "Car Servicing and Repair",
   mot_servicing: "Car Servicing, Repair and MOT",
   bodyshop: "Bodyshop",
   car_sales: "Car Sales (Used)",
@@ -145,7 +152,15 @@ function CheckboxInput({
   );
 }
 
-function OutputCard({ title, text }: { title: string; text: string }) {
+function OutputCard({
+  title,
+  text,
+  onChange,
+}: {
+  title: string;
+  text: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -155,10 +170,10 @@ function OutputCard({ title, text }: { title: string; text: string }) {
         <CopyButton text={text} />
       </div>
       <textarea
-        readOnly
         rows={14}
         value={text}
-        className="mt-4 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-950"
+        className="mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm leading-6 text-slate-950"
+        onChange={(event) => onChange(event.target.value)}
       />
     </section>
   );
@@ -166,14 +181,50 @@ function OutputCard({ title, text }: { title: string; text: string }) {
 
 export function SubmissionComposerPanel({
   caseId,
+  extractionId,
   initialInput,
+  initialOutputs,
   submissionStatus,
 }: ComposerPanelProps) {
   const [formData, setFormData] = useState(initialInput);
-  const outputs = useMemo(
-    () => generateSubmissionComposerOutputs(formData),
-    [formData],
+  // Outputs are editable text, not a pure derivation of the form: once
+  // generated, typing in the form must NOT silently overwrite manual edits.
+  // "Regenerate from form" is the explicit action that recomputes them.
+  const [outputs, setOutputs] = useState<SubmissionComposerOutputs>(
+    () => initialOutputs ?? generateSubmissionComposerOutputs(initialInput),
   );
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+
+  function regenerateOutputs() {
+    setOutputs(generateSubmissionComposerOutputs(formData));
+  }
+
+  function updateOutput<Key extends keyof SubmissionComposerOutputs>(
+    key: Key,
+    value: SubmissionComposerOutputs[Key],
+  ) {
+    setOutputs((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSave() {
+    setSaveState("saving");
+    try {
+      const result = await saveSubmissionComposerStateAction({
+        case_id: caseId,
+        extraction_id: extractionId,
+        composer_input: formData,
+        motor_trade_additional_information:
+          outputs.motor_trade_additional_information,
+        material_damage_additional_information:
+          outputs.material_damage_additional_information,
+        underwriter_email: outputs.underwriter_email,
+      });
+      setSaveState(result.success ? "saved" : "failed");
+    } catch {
+      setSaveState("failed");
+    }
+    window.setTimeout(() => setSaveState("idle"), 2500);
+  }
 
   const hasStockProfile =
     formData.business_type === "car_sales" || formData.business_type === "combined";
@@ -206,9 +257,25 @@ export function SubmissionComposerPanel({
               email text.
             </p>
           </div>
-          <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
-            Submission {submissionStatus ?? "not_started"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
+              Submission {submissionStatus ?? "not_started"}
+            </span>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+              onClick={handleSave}
+              disabled={saveState === "saving"}
+            >
+              {saveState === "saving"
+                ? "Saving..."
+                : saveState === "saved"
+                  ? "Saved"
+                  : saveState === "failed"
+                    ? "Save failed - retry"
+                    : "Save"}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -646,17 +713,38 @@ export function SubmissionComposerPanel({
         </section>
 
         <section className="space-y-6">
+          <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-sm text-slate-600">
+              These are editable — type directly into any box below. Changing
+              the form on the left won&apos;t touch your edits unless you
+              regenerate.
+            </p>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50"
+              onClick={regenerateOutputs}
+            >
+              Regenerate from form
+            </button>
+          </div>
           <OutputCard
             title="Motor Trade Combined - Additional Information"
             text={outputs.motor_trade_additional_information}
+            onChange={(value) =>
+              updateOutput("motor_trade_additional_information", value)
+            }
           />
           <OutputCard
             title="Material Damage - Additional Information"
             text={outputs.material_damage_additional_information}
+            onChange={(value) =>
+              updateOutput("material_damage_additional_information", value)
+            }
           />
           <OutputCard
             title="Underwriter Email"
             text={outputs.underwriter_email}
+            onChange={(value) => updateOutput("underwriter_email", value)}
           />
         </section>
       </div>

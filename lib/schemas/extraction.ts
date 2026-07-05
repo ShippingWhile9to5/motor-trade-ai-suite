@@ -135,10 +135,8 @@ const roadRisksSchema = z
     loan_and_hire_required: extractionFieldSchema,
     accompanied_demonstration: extractionFieldSchema,
     unaccompanied_demonstration: extractionFieldSchema,
-    number_of_trade_plates: extractionFieldSchema,
-    trade_plate_details: extractionFieldSchema,
-    recovery_work: extractionFieldSchema,
-    recovery_work_percentage: extractionFieldSchema,
+    number_of_trade_plates_including_details: extractionFieldSchema,
+    recovery_work_including_percentage: extractionFieldSchema,
     windscreen_cover: extractionFieldSchema,
   })
   .strict();
@@ -153,14 +151,12 @@ const driverDetailsRowSchema = z
   })
   .strict();
 
+// Only registration and value are ever filled in on the fact-find for
+// vehicle rows — make/model, year, use, and owner are deliberately omitted.
 const vehicleDetailsRowSchema = z
   .object({
-    vehicle_make_and_model: extractionFieldSchema,
-    vehicle_year: extractionFieldSchema,
-    vehicle_value: extractionFieldSchema,
     vehicle_registration: extractionFieldSchema,
-    vehicle_use: extractionFieldSchema,
-    vehicle_owner: extractionFieldSchema,
+    vehicle_value: extractionFieldSchema,
   })
   .strict();
 
