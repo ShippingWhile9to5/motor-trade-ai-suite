@@ -10,10 +10,30 @@ import { runFactFindExtractionWorkflow } from "../../lib/services/extraction-exe
 import { getExtractionProvider } from "../../lib/providers/get-extraction-provider";
 import type { ExtractionSourceFile } from "../../lib/providers/extraction";
 
+// A fact-find is fully legible well below full iPhone resolution. Downscaling
+// before sending to the model cuts vision-token processing (and latency) sharply
+// so extraction fits inside the serverless function time limit.
+const MAX_IMAGE_EDGE_PX = 1600;
+
+async function downscaleToJpegBase64(input: Buffer): Promise<string> {
+  const sharp = (await import("sharp")).default;
+  const output = await sharp(input)
+    .rotate() // honour EXIF orientation from phone photos
+    .resize(MAX_IMAGE_EDGE_PX, MAX_IMAGE_EDGE_PX, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+
+  return output.toString("base64");
+}
+
 /**
  * Reads the file bytes into a base64 payload for the AI provider, converting
- * iPhone HEIC/HEIF photos to JPEG (Claude vision does not accept HEIC). The
- * returned bytes are transient and never written to storage.
+ * iPhone HEIC/HEIF photos to JPEG (Claude vision does not accept HEIC) and
+ * downscaling photos. The returned bytes are transient and never written to
+ * storage.
  */
 async function toExtractionSource(
   file: File,
@@ -27,21 +47,28 @@ async function toExtractionSource(
 
   if (isHeic) {
     const convert = (await import("heic-convert")).default;
-    const output = await convert({ buffer, format: "JPEG", quality: 0.9 });
+    const jpeg = await convert({ buffer, format: "JPEG", quality: 0.9 });
 
     return {
       file_name: file.name,
       media_type: "image/jpeg",
-      data_base64: Buffer.from(output).toString("base64"),
+      data_base64: await downscaleToJpegBase64(Buffer.from(jpeg)),
     };
   }
 
-  const mediaType = type === "application/pdf" ? "application/pdf" : type;
+  if (type === "application/pdf") {
+    return {
+      file_name: file.name,
+      media_type: "application/pdf",
+      data_base64: buffer.toString("base64"),
+    };
+  }
 
+  // Other raster images (jpg/png/webp) — downscale to a JPEG too.
   return {
     file_name: file.name,
-    media_type: mediaType,
-    data_base64: buffer.toString("base64"),
+    media_type: "image/jpeg",
+    data_base64: await downscaleToJpegBase64(buffer),
   };
 }
 

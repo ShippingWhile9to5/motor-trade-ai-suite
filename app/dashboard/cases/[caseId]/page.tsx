@@ -10,6 +10,10 @@ import { CaseUploadSection } from "./case-upload-section";
 import { ReviewPanel } from "./review-panel";
 import { SubmissionPanel } from "./submission-panel";
 
+// Allow the synchronous upload+extract server action the maximum request time
+// (fact-find extraction calls the AI model inline; the image is never stored).
+export const maxDuration = 60;
+
 type CaseDetailPageProps = {
   params: Promise<{
     caseId: string;

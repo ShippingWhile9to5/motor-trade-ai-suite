@@ -1,7 +1,6 @@
 import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { env } from "../../env";
 import type { ExtractionProvider, ExtractionSourceFile } from "./extraction";
@@ -230,6 +229,27 @@ const responseSchema = z
 type ExtractionResponse = z.infer<typeof responseSchema>;
 type Leaf = z.infer<typeof leafSchema>;
 
+// The exact JSON shape we ask Claude to return, built from the same section
+// lists. Embedding this in the prompt (rather than using strict structured
+// outputs) avoids the constrained-decoding grammar-size limit that a ~100-field
+// strict schema hits, while still pinning the model to the exact keys.
+const RESPONSE_TEMPLATE: Record<string, unknown> = {};
+for (const [name, keys] of Object.entries(SCALAR_SECTIONS)) {
+  RESPONSE_TEMPLATE[name] = Object.fromEntries(
+    keys.map((key) => [key, { value: "", confidence: 0 }]),
+  );
+}
+for (const [name, keys] of Object.entries(ROW_SECTIONS)) {
+  RESPONSE_TEMPLATE[name] = [
+    Object.fromEntries(keys.map((key) => [key, { value: "", confidence: 0 }])),
+  ];
+}
+RESPONSE_TEMPLATE.unmapped_notes = [];
+RESPONSE_TEMPLATE.broker_notes = [];
+RESPONSE_TEMPLATE.handwritten_notes = [];
+
+const RESPONSE_TEMPLATE_JSON = JSON.stringify(RESPONSE_TEMPLATE);
+
 const SYSTEM_PROMPT = `You are a data-extraction assistant for a UK motor-trade insurance broker. You read photographed or scanned "Premier Insurance Centre — Combined Motor Trade Presentation" fact-find forms. The broker fills these in by hand while taking a client's answers, so the handwriting is theirs.
 
 Your job is to transcribe what is written on the form into the requested structured fields as faithfully as possible.
@@ -244,7 +264,11 @@ Rules:
 - driver_details, vehicle_details and claims_history are variable-length: return one object per row that has any content; omit empty rows.
 - Inline annotations next to a field (e.g. "keys taken home" beside the key-cabinet declaration) belong in that field's value.`;
 
-const USER_PROMPT = `Extract every field from this fact-find into the required structure. The pages provided together make up one client's fact-find (company details, premises, business activities, sums insured, employees, drivers, vehicles, claims, declarations). Read all pages before filling fields. Remember to capture handwriting written outside the printed boxes.`;
+const USER_PROMPT = `Extract every field from this fact-find. The pages provided together make up one client's fact-find (company details, premises, business activities, sums insured, employees, drivers, vehicles, claims, declarations). Read all pages before filling fields. Remember to capture handwriting written outside the printed boxes.
+
+Return ONLY a single JSON object — no prose, no explanation, no markdown code fences — matching EXACTLY this shape and these keys. For every field set "value" (a string; "" if blank on the form) and "confidence" (a number 0-1). For driver_details, vehicle_details and claims_history, include one object per row present on the form using the shown keys, or an empty array [] if there are none. Keep all other keys even when the value is "".
+
+${RESPONSE_TEMPLATE_JSON}`;
 
 function clampConfidence(value: number) {
   if (Number.isNaN(value)) {
@@ -271,22 +295,25 @@ function toField(leaf: Leaf | undefined): ExtractionField {
 
 function mapScalarSection(
   keys: readonly string[],
-  section: Record<string, Leaf>,
+  section: Record<string, Leaf> | undefined,
 ): Record<string, ExtractionField> {
-  return Object.fromEntries(keys.map((key) => [key, toField(section[key])]));
+  return Object.fromEntries(keys.map((key) => [key, toField(section?.[key])]));
 }
 
 function mapRowSection(
   keys: readonly string[],
-  rows: Array<Record<string, Leaf>>,
+  rows: Array<Record<string, Leaf>> | undefined,
 ): Array<Record<string, ExtractionField>> {
-  return rows.map((row) =>
-    Object.fromEntries(keys.map((key) => [key, toField(row[key])])),
+  return (Array.isArray(rows) ? rows : []).map((row) =>
+    Object.fromEntries(keys.map((key) => [key, toField(row?.[key])])),
   );
 }
 
-function noteField(notes: string[]): ExtractionField {
-  const value = notes.map((note) => note.trim()).filter(Boolean).join("; ");
+function noteField(notes: string[] | undefined): ExtractionField {
+  const value = (Array.isArray(notes) ? notes : [])
+    .map((note) => String(note).trim())
+    .filter(Boolean)
+    .join("; ");
 
   return {
     value,
@@ -385,6 +412,19 @@ function toContentBlock(file: ExtractionSourceFile) {
   };
 }
 
+function parseJsonObject(text: string): unknown {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+
+  if (start === -1 || end <= start) {
+    throw new Error("The AI provider did not return a JSON object.");
+  }
+
+  return JSON.parse(candidate.slice(start, end + 1));
+}
+
 export const anthropicFactFindProvider: ExtractionProvider = {
   async extract(files: ExtractionSourceFile[]): Promise<FactFindExtraction> {
     if (files.length === 0) {
@@ -393,11 +433,13 @@ export const anthropicFactFindProvider: ExtractionProvider = {
 
     const client = new Anthropic({ apiKey: env.AI_PROVIDER_API_KEY });
 
-    const response = await client.messages.parse({
+    const response = await client.messages.create({
       model: EXTRACTION_MODEL,
-      max_tokens: 8000,
+      max_tokens: 12000,
       system: SYSTEM_PROMPT,
-      output_config: { format: zodOutputFormat(responseSchema) },
+      // Reading a fixed form is not a deep-reasoning task; low effort keeps the
+      // call fast enough to finish inside the serverless function time limit.
+      output_config: { effort: "low" },
       messages: [
         {
           role: "user",
@@ -413,10 +455,16 @@ export const anthropicFactFindProvider: ExtractionProvider = {
       throw new Error("The extraction request was declined by the AI provider.");
     }
 
-    if (!response.parsed_output) {
-      throw new Error("The AI provider did not return a structured extraction.");
+    const textBlock = response.content.find((block) => block.type === "text");
+
+    if (!textBlock || textBlock.type !== "text") {
+      throw new Error("The AI provider did not return a text response.");
     }
 
-    return mapResponseToExtraction(response.parsed_output);
+    // JSON is parsed and mapped defensively; the final
+    // factFindExtractionSchema.parse in mapResponseToExtraction is the guard.
+    const parsed = parseJsonObject(textBlock.text) as ExtractionResponse;
+
+    return mapResponseToExtraction(parsed);
   },
 };
