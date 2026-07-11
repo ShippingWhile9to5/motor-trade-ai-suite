@@ -30,6 +30,8 @@ Guidelines:
 - Extract ALL excesses with their specific amounts and categories - excesses often differ between material damage and road risks sections, keep them separate.
 - List every significant exclusion - do not skip standard boilerplate exclusions, but prioritise completeness over brevity.
 - Include every endorsement and condition, always preserving the reference code when the document shows one.
+- Each coded item must appear in EXACTLY ONE of exclusions, endorsements, or conditions - never duplicate an item across lists. If an endorsement functions as an exclusion (e.g. 'HE011 - Waste Oil Heater Exclusion'), put it under exclusions only. If it imposes a requirement or restriction the client must follow, put it under endorsements or conditions.
+- Also include uncoded conditions the schedule marks as applying, e.g. an 'Intruder Alarm Condition' shown as Operative belongs in conditions. Ignore items marked Not Operative or Not Applicable.
 - Be precise with amounts and codes - a broker will copy these directly into a client letter and their broker management system.
 - If a field has no matching information, use an empty array [] or empty string "".`;
 
