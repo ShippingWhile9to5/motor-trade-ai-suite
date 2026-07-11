@@ -2,27 +2,15 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { saveSubmissionComposerStateAction } from "../../../../actions/submissions";
-import { generateSubmissionComposerOutputs } from "../../../../../lib/submission-composer";
+import { generateSubmissionComposerOutputs } from "../../lib/submission-composer";
 import type {
   SubmissionComposerBusinessType,
   SubmissionComposerInput,
   SubmissionComposerOutputs,
   SubmissionComposerStockProfile,
-} from "../../../../../lib/schemas/submission-composer";
-import type { SubmissionStatus } from "../../../../../lib/schemas/submission";
-
-type ComposerPanelProps = {
-  caseId: string;
-  extractionId: string;
-  initialInput: SubmissionComposerInput;
-  initialOutputs: SubmissionComposerOutputs | null;
-  submissionStatus?: SubmissionStatus;
-};
+} from "../../lib/schemas/submission-composer";
 
 type CopyState = "idle" | "copied" | "failed";
-
-type SaveState = "idle" | "saving" | "saved" | "failed";
 
 const businessTypeLabels: Record<SubmissionComposerBusinessType, string> = {
   servicing_and_repair: "Car Servicing and Repair",
@@ -36,6 +24,67 @@ const stockProfileLabels: Record<SubmissionComposerStockProfile, string> = {
   standard: "Standard Used Cars (up to GBP 15k average)",
   mid_range: "Mid-Range/Premium (GBP 15k-GBP 50k average)",
   prestige: "Prestige/Exotic (GBP 50k+ average)",
+};
+
+const blankInput: SubmissionComposerInput = {
+  business_type: "servicing_and_repair",
+  stock_profile: "standard",
+  business_name: "",
+  director_name: "",
+  established_year: "",
+  incorporated_year: "",
+  trade_experience: "",
+  prestige_experience: "",
+  no_claims_bonus: "",
+  primary_operations: "",
+  private_cars_percent: "",
+  light_commercial_vehicles_percent: "",
+  classics_percent: "",
+  bikes_percent: "",
+  location: "",
+  construction_year: "",
+  tenure: "",
+  walls: "",
+  roof: "",
+  floors: "",
+  heating: "",
+  police_distance: "",
+  fire_distance: "",
+  business_hours_mon_to_fri: "",
+  business_hours_saturday: "",
+  business_hours_sunday: "",
+  average_vehicle_value: "",
+  maximum_vehicle_value: "",
+  maximum_used_car_value: "",
+  underwriter_name: "",
+  target_premium: "",
+  cover_requirements: "",
+  security_details: "",
+  security_company: "",
+  housekeeping: "Excellent",
+  vehicle_storage: "",
+  safety_notes: "",
+  customer_facilities: "",
+  work_mot: false,
+  work_servicing: false,
+  work_repairs: false,
+  work_bodywork: false,
+  work_welding: false,
+  security_alarm: false,
+  security_cctv: false,
+  security_lighting: false,
+  security_shutters: false,
+  security_fencing: false,
+  security_ram_bars: false,
+  compliance_iee: false,
+  compliance_health_safety: false,
+  compliance_accident_book: false,
+  compliance_risk_assessment: false,
+  compliance_licence_checks: false,
+  compliance_excess_recovery: false,
+  welding_percentage: "",
+  paint_spraying: false,
+  paint_spraying_percentage: "",
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -179,21 +228,14 @@ function OutputCard({
   );
 }
 
-export function SubmissionComposerPanel({
-  caseId,
-  extractionId,
-  initialInput,
-  initialOutputs,
-  submissionStatus,
-}: ComposerPanelProps) {
-  const [formData, setFormData] = useState(initialInput);
+export function SubmissionComposerPanel() {
+  const [formData, setFormData] = useState<SubmissionComposerInput>(blankInput);
   // Outputs are editable text, not a pure derivation of the form: once
   // generated, typing in the form must NOT silently overwrite manual edits.
   // "Regenerate from form" is the explicit action that recomputes them.
-  const [outputs, setOutputs] = useState<SubmissionComposerOutputs>(
-    () => initialOutputs ?? generateSubmissionComposerOutputs(initialInput),
+  const [outputs, setOutputs] = useState<SubmissionComposerOutputs>(() =>
+    generateSubmissionComposerOutputs(blankInput),
   );
-  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   function regenerateOutputs() {
     setOutputs(generateSubmissionComposerOutputs(formData));
@@ -204,26 +246,6 @@ export function SubmissionComposerPanel({
     value: SubmissionComposerOutputs[Key],
   ) {
     setOutputs((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleSave() {
-    setSaveState("saving");
-    try {
-      const result = await saveSubmissionComposerStateAction({
-        case_id: caseId,
-        extraction_id: extractionId,
-        composer_input: formData,
-        motor_trade_additional_information:
-          outputs.motor_trade_additional_information,
-        material_damage_additional_information:
-          outputs.material_damage_additional_information,
-        underwriter_email: outputs.underwriter_email,
-      });
-      setSaveState(result.success ? "saved" : "failed");
-    } catch {
-      setSaveState("failed");
-    }
-    window.setTimeout(() => setSaveState("idle"), 2500);
   }
 
   const hasStockProfile =
@@ -242,40 +264,21 @@ export function SubmissionComposerPanel({
     <section className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
         <Link
-          href={`/dashboard/cases/${caseId}`}
+          href="/"
           className="text-sm font-medium text-slate-600 hover:text-slate-950"
         >
-          Back to case
+          Back to home
         </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
-              Submission Composer
-            </h1>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              Smart form and generated outputs for Acturis notes and insurer
-              email text.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
-              Submission {submissionStatus ?? "not_started"}
-            </span>
-            <button
-              type="button"
-              className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-              onClick={handleSave}
-              disabled={saveState === "saving"}
-            >
-              {saveState === "saving"
-                ? "Saving..."
-                : saveState === "saved"
-                  ? "Saved"
-                  : saveState === "failed"
-                    ? "Save failed - retry"
-                    : "Save"}
-            </button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
+            Submission Composer
+          </h1>
+          <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+            Fill this in from your fact-find, then copy the generated text
+            into Acturis and your underwriter email. Nothing here is saved -
+            close the tab and it's gone, so copy what you need before you
+            leave.
+          </p>
         </div>
       </header>
 
@@ -715,7 +718,7 @@ export function SubmissionComposerPanel({
         <section className="space-y-6">
           <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <p className="text-sm text-slate-600">
-              These are editable — type directly into any box below. Changing
+              These are editable - type directly into any box below. Changing
               the form on the left won&apos;t touch your edits unless you
               regenerate.
             </p>

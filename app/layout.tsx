@@ -62,7 +62,7 @@ export default function RootLayout({
             <header className="border-b border-slate-200 bg-white">
               <div className="mx-auto flex min-h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
                 <Link
-                  href="/dashboard"
+                  href="/"
                   className="text-sm font-semibold text-slate-950"
                 >
                   Motor Trade AI Suite

@@ -9,12 +9,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().min(1),
   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   AI_PROVIDER_API_KEY: z.string().min(1),
-  UPSTASH_REDIS_REST_URL: z.string().url(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
-  SENTRY_DSN: z.string().url(),
 });
 
 const parsedEnv = envSchema.safeParse({
@@ -27,12 +22,7 @@ const parsedEnv = envSchema.safeParse({
   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:
     process.env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-  SUPABASE_URL: process.env.SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   AI_PROVIDER_API_KEY: process.env.AI_PROVIDER_API_KEY,
-  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
-  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
-  SENTRY_DSN: process.env.SENTRY_DSN,
 });
 
 if (!parsedEnv.success) {

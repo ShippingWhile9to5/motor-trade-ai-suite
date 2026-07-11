@@ -1,6 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isProtectedRoute = createRouteMatcher(["/", "/dashboard(.*)"]);
+const isProtectedRoute = createRouteMatcher([
+  "/",
+  "/composer(.*)",
+  "/policy-letter(.*)",
+]);
 
 // Clerk's current App Router guidance uses proxy.ts for Next 16+.
 // This project runs Next 15, so the same clerkMiddleware setup stays in middleware.ts.
