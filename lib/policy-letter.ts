@@ -264,15 +264,10 @@ export function generateLetter(
       sections.push("");
     }
 
-    const allEndorsementsAndConditions = [
-      ...(extractedData.endorsements || []),
-      ...(extractedData.conditions || []),
-    ];
-
-    if (allEndorsementsAndConditions.length > 0) {
+    if (extractedData.endorsementsAndConditions && extractedData.endorsementsAndConditions.length > 0) {
       sections.push("ENDORSEMENTS & CONDITIONS");
       sections.push("");
-      allEndorsementsAndConditions.forEach((item) => {
+      extractedData.endorsementsAndConditions.forEach((item) => {
         sections.push(item);
       });
       sections.push("");

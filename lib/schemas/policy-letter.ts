@@ -9,8 +9,7 @@ export const excessSchema = z.object({
 export const extractedPolicyDataSchema = z.object({
   excesses: z.array(excessSchema),
   exclusions: z.array(z.string()),
-  endorsements: z.array(z.string()),
-  conditions: z.array(z.string()),
+  endorsementsAndConditions: z.array(z.string()),
   driverBasis: z.string(),
   businessDescription: z.string(),
   coverIncluded: z.array(z.string()),

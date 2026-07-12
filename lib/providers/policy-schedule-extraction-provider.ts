@@ -17,9 +17,8 @@ Return ONLY a JSON object, no markdown fences, no commentary, matching exactly t
   "excesses": [
     { "category": "string, e.g. 'Accidental Damage', 'Fire & Theft', 'Windscreen'", "amount": "string, e.g. '£500', '£250 each and every claim'", "description": "string, optional" }
   ],
-  "exclusions": ["string - each significant exclusion. If a reference code is shown, keep it in the format 'CODE - Description', e.g. 'HE011 - Waste Oil Heater Exclusion'"],
-  "endorsements": ["string - each endorsement or special condition, same 'CODE - Description' format when a code is present, e.g. 'PY024 - Revised Vehicle Excesses'"],
-  "conditions": ["string - each important condition, same 'CODE - Description' format when a code is present"],
+  "exclusions": ["string - each significant exclusion that carries a reference code, in the format 'CODE - Description', e.g. 'HE011 - Waste Oil Heater Exclusion'. Do NOT include general coverage facts with no code, such as a schedule line reading 'Terrorism: Excluded' or a note that a section/cover is not included - those belong in coverNotIncluded instead."],
+  "endorsementsAndConditions": ["string - every endorsement, special condition, and important requirement on the policy, in one combined list. Preserve the reference code in 'CODE - Description' format when the document shows one, e.g. 'PY024 - Revised Vehicle Excesses'. Include uncoded conditions too, e.g. 'Intruder Alarm Condition - Operative'."],
   "driverBasis": "string, e.g. 'Any Employee for Business use, Named for SDP'",
   "businessDescription": "string - the insured's business type as stated in the schedule",
   "coverIncluded": ["string - each type of cover included"],
@@ -29,9 +28,9 @@ Return ONLY a JSON object, no markdown fences, no commentary, matching exactly t
 Guidelines:
 - Extract ALL excesses with their specific amounts and categories - excesses often differ between material damage and road risks sections, keep them separate.
 - List every significant exclusion - do not skip standard boilerplate exclusions, but prioritise completeness over brevity.
-- Include every endorsement and condition, always preserving the reference code when the document shows one.
-- Each coded item must appear in EXACTLY ONE of exclusions, endorsements, or conditions - never duplicate an item across lists. If an endorsement functions as an exclusion (e.g. 'HE011 - Waste Oil Heater Exclusion'), put it under exclusions only. If it imposes a requirement or restriction the client must follow, put it under endorsements or conditions.
-- Also include uncoded conditions the schedule marks as applying, e.g. an 'Intruder Alarm Condition' shown as Operative belongs in conditions. Ignore items marked Not Operative or Not Applicable.
+- Include every endorsement and condition in endorsementsAndConditions, always preserving the reference code when the document shows one.
+- Each coded item must appear in EXACTLY ONE of exclusions or endorsementsAndConditions - never duplicate an item across both. If an endorsement functions as an exclusion (e.g. 'HE011 - Waste Oil Heater Exclusion'), put it under exclusions only.
+- Also include uncoded conditions the schedule marks as applying, e.g. an 'Intruder Alarm Condition' shown as Operative belongs in endorsementsAndConditions. Ignore items marked Not Operative or Not Applicable.
 - Be precise with amounts and codes - a broker will copy these directly into a client letter and their broker management system.
 - If a field has no matching information, use an empty array [] or empty string "".`;
 

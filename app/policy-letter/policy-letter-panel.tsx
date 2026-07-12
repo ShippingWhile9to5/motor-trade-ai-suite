@@ -400,17 +400,10 @@ export function PolicyLetterPanel() {
           </div>
 
           <EditableList
-            title="Endorsements"
-            items={extractedData.endorsements}
+            title="Endorsements & Conditions"
+            items={extractedData.endorsementsAndConditions}
             onChange={(items) =>
-              setExtractedData({ ...extractedData, endorsements: items })
-            }
-          />
-          <EditableList
-            title="Conditions"
-            items={extractedData.conditions}
-            onChange={(items) =>
-              setExtractedData({ ...extractedData, conditions: items })
+              setExtractedData({ ...extractedData, endorsementsAndConditions: items })
             }
           />
           <EditableList
