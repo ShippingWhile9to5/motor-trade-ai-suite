@@ -341,61 +341,13 @@ export function PolicyLetterPanel() {
             Edit or remove anything before it goes into the letter.
           </p>
 
-          <div>
-            <h3 className="text-sm font-medium text-slate-950">
-              Excesses ({extractedData.excesses.length})
-            </h3>
-            {extractedData.excesses.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">
-                None found in document.
-              </p>
-            ) : (
-              <div className="mt-2 space-y-3">
-                {extractedData.excesses.map((excess, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3"
-                  >
-                    <input
-                      type="text"
-                      value={excess.category}
-                      placeholder="Category"
-                      className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-                      onChange={(event) => {
-                        const next = [...extractedData.excesses];
-                        next[index] = { ...next[index], category: event.target.value };
-                        setExtractedData({ ...extractedData, excesses: next });
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={excess.amount}
-                      placeholder="Amount"
-                      className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-                      onChange={(event) => {
-                        const next = [...extractedData.excesses];
-                        next[index] = { ...next[index], amount: event.target.value };
-                        setExtractedData({ ...extractedData, excesses: next });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
-                      onClick={() =>
-                        setExtractedData({
-                          ...extractedData,
-                          excesses: extractedData.excesses.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+          <EditableList
+            title="Excesses"
+            items={extractedData.excesses}
+            onChange={(items) =>
+              setExtractedData({ ...extractedData, excesses: items })
+            }
+          />
           <EditableList
             title="Endorsements & Conditions"
             items={extractedData.endorsementsAndConditions}

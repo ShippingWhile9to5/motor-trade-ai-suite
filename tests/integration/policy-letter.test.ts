@@ -130,8 +130,8 @@ test("extracted data fills the three copy-out sections", () => {
   const outputs = generatePolicyLetterOutputs(
     {
       excesses: [
-        { category: "Material Damage - All Other Losses", amount: "£500" },
-        { category: "Road Risks - Windscreen", amount: "£150" },
+        "Material Damage - All Other Losses - £500",
+        "Road Risks - Windscreen - £150",
       ],
       exclusions: ["L0038 - Work Away Exclusion"],
       endorsementsAndConditions: [
@@ -153,7 +153,7 @@ test("extracted data fills the three copy-out sections", () => {
   assert.equal(outputs.significantExclusions, "L0038 - Work Away Exclusion");
   assert.equal(
     outputs.excesses,
-    "Material Damage - All Other Losses: £500\nRoad Risks - Windscreen: £150",
+    "Material Damage - All Other Losses - £500\nRoad Risks - Windscreen - £150",
   );
 });
 

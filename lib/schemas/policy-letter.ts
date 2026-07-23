@@ -1,13 +1,8 @@
 import { z } from "zod";
 
-export const excessSchema = z.object({
-  category: z.string(),
-  amount: z.string(),
-  description: z.string().optional(),
-});
-
 export const extractedPolicyDataSchema = z.object({
-  excesses: z.array(excessSchema),
+  // Each excess is a single ready-to-paste line, e.g. "Material Damage - £350".
+  excesses: z.array(z.string()),
   exclusions: z.array(z.string()),
   endorsementsAndConditions: z.array(z.string()),
   driverBasis: z.string(),
@@ -21,7 +16,6 @@ export const extractPolicyDataResultSchema = z.discriminatedUnion("success", [
   z.object({ success: z.literal(false), error: z.string() }),
 ]);
 
-export type Excess = z.infer<typeof excessSchema>;
 export type ExtractedPolicyData = z.infer<typeof extractedPolicyDataSchema>;
 export type ExtractPolicyDataResult = z.infer<
   typeof extractPolicyDataResultSchema

@@ -14,9 +14,7 @@ const SYSTEM_PROMPT = `You are an expert at reading UK motor trade insurance pol
 Return ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape:
 
 {
-  "excesses": [
-    { "category": "string, e.g. 'Accidental Damage', 'Fire & Theft', 'Windscreen'", "amount": "string, e.g. '£500', '£250 each and every claim'", "description": "string, optional" }
-  ],
+  "excesses": ["string - one ready-to-paste line per excess in the format 'Name - Amount', e.g. 'Material Damage - £350', 'Windscreen - £150', 'Accidental Damage - £250 each and every claim'. Always include the £ symbol on the amount."],
   "exclusions": ["string - each significant exclusion that carries a reference code, as 'CODE - Title' copied verbatim from the item's heading, e.g. 'HE011 - Waste Oil Heater Exclusion'. Do NOT include general coverage facts with no code, such as a schedule line reading 'Terrorism: Excluded' or a note that a section/cover is not included - those belong in coverNotIncluded instead."],
   "endorsementsAndConditions": ["string - every endorsement, special condition, and important requirement on the policy, in one combined list, each as 'CODE - Title' copied verbatim from the item's heading, e.g. 'PY024 - Revised Vehicle Excesses'. Include uncoded conditions too, e.g. 'Intruder Alarm Condition - Operative'."],
   "driverBasis": "string, e.g. 'Any Employee for Business use, Named for SDP'",
@@ -26,7 +24,7 @@ Return ONLY a JSON object, no markdown fences, no commentary, matching exactly t
 }
 
 Guidelines:
-- Extract ALL excesses with their specific amounts and categories - excesses often differ between material damage and road risks sections, keep them separate.
+- Extract ALL excesses with their specific amounts - excesses often differ between material damage and road risks sections, keep them as separate lines. Write each as 'Name - Amount' (e.g. 'Road Risks - £500'), the exact format a broker pastes into their system.
 - List every significant exclusion - do not skip standard boilerplate exclusions, but prioritise completeness over brevity.
 - Include every endorsement and condition in endorsementsAndConditions, always preserving the reference code when the document shows one.
 - Each coded item must appear in EXACTLY ONE of exclusions or endorsementsAndConditions - never duplicate an item across both. If an endorsement functions as an exclusion (e.g. 'HE011 - Waste Oil Heater Exclusion'), put it under exclusions only.

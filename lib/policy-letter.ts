@@ -184,8 +184,6 @@ export function generatePolicyLetterOutputs(
       extractedData?.endorsementsAndConditions ?? []
     ).join("\n"),
     significantExclusions: (extractedData?.exclusions ?? []).join("\n"),
-    excesses: (extractedData?.excesses ?? [])
-      .map((excess) => `${excess.category}: ${excess.amount}`)
-      .join("\n"),
+    excesses: (extractedData?.excesses ?? []).join("\n"),
   };
 }
