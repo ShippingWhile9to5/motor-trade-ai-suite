@@ -6,11 +6,13 @@ import { extractPolicyScheduleAction } from "../../app/actions/policy-letter";
 import {
   INSURERS,
   DRIVER_BASIS_OPTIONS,
-  blankPolicyLetterManualInput,
-  calculateTotals,
-  generateLetter,
+  createBlankPolicyLetterManualInput,
+  defaultBenefitsForInsurer,
+  generatePolicyLetterOutputs,
+  resolveDriverBasis,
   type Insurer,
   type PolicyLetterManualInput,
+  type PolicyLetterOutputs,
 } from "../../lib/policy-letter";
 import type { ExtractedPolicyData } from "../../lib/schemas/policy-letter";
 
@@ -42,6 +44,31 @@ function Section({
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [state, setState] = useState<CopyState>("idle");
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+      window.setTimeout(() => setState("idle"), 1800);
+    } catch {
+      setState("failed");
+      window.setTimeout(() => setState("idle"), 1800);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="min-h-11 shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50"
+      onClick={handleCopy}
+    >
+      {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
+    </button>
+  );
+}
+
 function TextInput({
   label,
   value,
@@ -62,35 +89,6 @@ function TextInput({
         placeholder={placeholder}
         className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
         onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function NumberInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: number | "";
-  onChange: (value: number | "") => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-slate-950">{label}</span>
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        value={value}
-        placeholder={placeholder}
-        className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-        onChange={(event) =>
-          onChange(event.target.value === "" ? "" : Number(event.target.value))
-        }
       />
     </label>
   );
@@ -163,6 +161,22 @@ function EditableList({
   );
 }
 
+function OutputCard({ title, text }: { title: string; text: string }) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {title}
+        </h2>
+        <CopyButton text={text} />
+      </div>
+      <pre className="mt-4 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-950">
+        {text}
+      </pre>
+    </section>
+  );
+}
+
 export function PolicyLetterPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -172,10 +186,9 @@ export function PolicyLetterPanel() {
     null,
   );
   const [manualInput, setManualInput] = useState<PolicyLetterManualInput>(
-    blankPolicyLetterManualInput,
+    createBlankPolicyLetterManualInput,
   );
-  const [generatedLetter, setGeneratedLetter] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [outputs, setOutputs] = useState<PolicyLetterOutputs | null>(null);
 
   function updateManualField<Key extends keyof PolicyLetterManualInput>(
     key: Key,
@@ -184,12 +197,13 @@ export function PolicyLetterPanel() {
     setManualInput((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleInsurerApproached(insurer: Insurer) {
+  // Selecting an insurer applies that insurer's standard benefits; both
+  // checkboxes stay editable afterwards.
+  function handleInsurerChange(insurer: Insurer | "") {
     setManualInput((current) => ({
       ...current,
-      insurersApproached: current.insurersApproached.includes(insurer)
-        ? current.insurersApproached.filter((value) => value !== insurer)
-        : [...current.insurersApproached, insurer],
+      insurer,
+      benefits: defaultBenefitsForInsurer(insurer),
     }));
   }
 
@@ -203,7 +217,7 @@ export function PolicyLetterPanel() {
     setSelectedFile(file);
     setExtractedData(null);
     setExtractError(null);
-    setGeneratedLetter(null);
+    setOutputs(null);
   }
 
   async function handleExtract() {
@@ -230,28 +244,11 @@ export function PolicyLetterPanel() {
   }
 
   function handleGenerateLetter() {
-    setGeneratedLetter(generateLetter(extractedData, manualInput));
+    setOutputs(generatePolicyLetterOutputs(extractedData, manualInput));
   }
 
-  async function handleCopy() {
-    if (!generatedLetter) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(generatedLetter);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
-    window.setTimeout(() => setCopyState("idle"), 1800);
-  }
-
-  const totals = calculateTotals(manualInput);
   const canGenerateLetter =
-    manualInput.insurer !== "" &&
-    manualInput.premiumExclIPT !== "" &&
-    manualInput.ipt !== "";
+    resolveDriverBasis(manualInput) !== "" && manualInput.quoteDate !== "";
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -269,8 +266,8 @@ export function PolicyLetterPanel() {
           <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
             Upload the policy schedule once a quote is accepted, review the
             extracted endorsements/conditions/exclusions/excesses, add the
-            quote figures, and copy the letter into Acturis and your client
-            email. Nothing here is saved.
+            quote details, then copy each block into Acturis. Nothing here is
+            saved.
           </p>
         </div>
       </header>
@@ -322,7 +319,7 @@ export function PolicyLetterPanel() {
                   setSelectedFile(null);
                   setExtractedData(null);
                   setExtractError(null);
-                  setGeneratedLetter(null);
+                  setOutputs(null);
                   if (fileInputRef.current) {
                     fileInputRef.current.value = "";
                   }
@@ -414,7 +411,7 @@ export function PolicyLetterPanel() {
             }
           />
           <TextInput
-            label="Driver basis"
+            label="Driver basis (as extracted from the schedule)"
             value={extractedData.driverBasis}
             onChange={(value) =>
               setExtractedData({ ...extractedData, driverBasis: value })
@@ -433,7 +430,7 @@ export function PolicyLetterPanel() {
               value={manualInput.insurer}
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
               onChange={(event) =>
-                updateManualField("insurer", event.target.value as Insurer | "")
+                handleInsurerChange(event.target.value as Insurer | "")
               }
             >
               <option value="">Select insurer</option>
@@ -446,175 +443,83 @@ export function PolicyLetterPanel() {
           </label>
           <label className="block">
             <span className="block text-sm font-medium text-slate-950">
-              Driver basis
+              Quote date
             </span>
-            <select
-              value={manualInput.driverBasis}
+            <input
+              type="date"
+              value={manualInput.quoteDate}
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
               onChange={(event) =>
-                updateManualField(
-                  "driverBasis",
-                  event.target.value as PolicyLetterManualInput["driverBasis"],
-                )
+                updateManualField("quoteDate", event.target.value)
               }
-            >
-              <option value="">Select driver basis</option>
-              {DRIVER_BASIS_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              The quotation is valid for 30 days from this date.
+            </span>
           </label>
-        </div>
-
-        <TextInput
-          label="Business description"
-          value={manualInput.businessDescription}
-          onChange={(value) => updateManualField("businessDescription", value)}
-          placeholder="e.g., Motor Trade with Taxi"
-        />
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <NumberInput
-            label="Premium excl. IPT (£)"
-            value={manualInput.premiumExclIPT}
-            onChange={(value) => updateManualField("premiumExclIPT", value)}
-          />
-          <NumberInput
-            label="IPT (£)"
-            value={manualInput.ipt}
-            onChange={(value) => updateManualField("ipt", value)}
-          />
-          <NumberInput
-            label="VAT (£)"
-            value={manualInput.vat}
-            onChange={(value) => updateManualField("vat", value)}
-            placeholder="optional"
-          />
-          <NumberInput
-            label="Admin Fee (£)"
-            value={manualInput.adminFee}
-            onChange={(value) => updateManualField("adminFee", value)}
-          />
-        </div>
-
-        <div className="flex items-center justify-between rounded-md border border-sky-200 bg-sky-50 px-4 py-3">
-          <span className="text-sm font-medium text-slate-700">
-            Total (Premium + IPT + VAT + Admin Fee)
-          </span>
-          <span className="text-lg font-semibold text-sky-700">
-            £{totals.total.toFixed(2)}
-          </span>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-slate-950">Deposit</h3>
-          <div className="mt-2 space-y-3">
-            <CheckboxInput
-              label="Deposit required"
-              checked={manualInput.depositRequired}
-              onChange={(checked) => updateManualField("depositRequired", checked)}
-            />
-            {manualInput.depositRequired ? (
-              <NumberInput
-                label="Deposit percentage (%)"
-                value={manualInput.depositPercentage}
-                onChange={(value) => updateManualField("depositPercentage", value)}
-              />
-            ) : null}
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-slate-950">
-            Investec premium finance (10 months)
-          </h3>
-          <div className="mt-2 grid gap-4 md:grid-cols-2">
-            <NumberInput
-              label="Interest rate (%)"
-              value={manualInput.investecFinanceRate}
-              onChange={(value) => updateManualField("investecFinanceRate", value)}
-            />
-            <NumberInput
-              label="APR (%)"
-              value={manualInput.investecAPR}
-              onChange={(value) => updateManualField("investecAPR", value)}
-            />
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-slate-950">
-            Insurer&apos;s own instalment option
-          </h3>
-          <div className="mt-2 space-y-3">
-            <CheckboxInput
-              label="Available"
-              checked={manualInput.insurerInstalmentAvailable}
-              onChange={(checked) =>
-                updateManualField("insurerInstalmentAvailable", checked)
-              }
-            />
-            {manualInput.insurerInstalmentAvailable ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <NumberInput
-                  label="Interest rate (%)"
-                  value={manualInput.insurerInstalmentRate}
-                  onChange={(value) =>
-                    updateManualField("insurerInstalmentRate", value)
-                  }
-                />
-                <label className="block">
-                  <span className="block text-sm font-medium text-slate-950">
-                    Number of months
-                  </span>
-                  <select
-                    value={manualInput.insurerInstalmentMonths}
-                    className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-                    onChange={(event) =>
-                      updateManualField(
-                        "insurerInstalmentMonths",
-                        Number(event.target.value) as 10 | 12,
-                      )
-                    }
-                  >
-                    <option value={10}>10 months</option>
-                    <option value={12}>12 months</option>
-                  </select>
-                </label>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-slate-950">
-            Insurers approached
-          </h3>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {INSURERS.map((insurer) => (
-              <CheckboxInput
-                key={insurer}
-                label={insurer}
-                checked={manualInput.insurersApproached.includes(insurer)}
-                onChange={() => toggleInsurerApproached(insurer)}
-              />
-            ))}
-          </div>
         </div>
 
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">
-            Special notes (optional)
+            Driver basis
           </span>
-          <textarea
-            rows={3}
-            value={manualInput.specialNotes}
-            className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm leading-6 text-slate-950"
-            onChange={(event) => updateManualField("specialNotes", event.target.value)}
-          />
+          <select
+            value={manualInput.driverBasis}
+            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+            onChange={(event) =>
+              updateManualField(
+                "driverBasis",
+                event.target.value as PolicyLetterManualInput["driverBasis"],
+              )
+            }
+          >
+            <option value="">Select driver basis</option>
+            {DRIVER_BASIS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
+
+        <TextInput
+          label="Or type a different driver basis (overrides the dropdown)"
+          value={manualInput.driverBasisOverride}
+          onChange={(value) => updateManualField("driverBasisOverride", value)}
+          placeholder="e.g. Any driver for Business and named for SDP use"
+        />
+
+        <div>
+          <h3 className="text-sm font-medium text-slate-950">
+            Benefits included
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Ticked automatically based on the insurer selected - change them if
+            this policy differs.
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <CheckboxInput
+              label="Premier Protected NCD"
+              checked={manualInput.benefits.premierProtectedNcd}
+              onChange={(checked) =>
+                updateManualField("benefits", {
+                  ...manualInput.benefits,
+                  premierProtectedNcd: checked,
+                })
+              }
+            />
+            <CheckboxInput
+              label="Low Claims Rebate"
+              checked={manualInput.benefits.lowClaimsRebate}
+              onChange={(checked) =>
+                updateManualField("benefits", {
+                  ...manualInput.benefits,
+                  lowClaimsRebate: checked,
+                })
+              }
+            />
+          </div>
+        </div>
       </Section>
 
       <div className="flex flex-col items-center gap-2">
@@ -628,33 +533,33 @@ export function PolicyLetterPanel() {
         </button>
         {!canGenerateLetter ? (
           <p className="text-sm text-slate-500">
-            Fill in Insurer, Premium excl. IPT, and IPT to generate the letter.
+            Select or type a driver basis, and set the quote date, to generate.
           </p>
         ) : null}
       </div>
 
-      {generatedLetter ? (
-        <Section title="Generated letter">
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50"
-              onClick={handleCopy}
-            >
-              {copyState === "copied"
-                ? "Copied"
-                : copyState === "failed"
-                  ? "Copy failed"
-                  : "Copy to clipboard"}
-            </button>
-          </div>
-          <pre className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-950">
-            {generatedLetter}
-          </pre>
-          <p className="text-xs text-slate-500">
-            This letter body can be pasted directly into Acturis.
-          </p>
-        </Section>
+      {outputs ? (
+        <div className="space-y-6">
+          <OutputCard
+            title="Opening paragraph"
+            text={outputs.openingParagraph}
+          />
+          {outputs.endorsementsAndConditions ? (
+            <OutputCard
+              title="Endorsements and Conditions"
+              text={outputs.endorsementsAndConditions}
+            />
+          ) : null}
+          {outputs.significantExclusions ? (
+            <OutputCard
+              title="Significant Exclusions and Non-Standard Excesses"
+              text={outputs.significantExclusions}
+            />
+          ) : null}
+          {outputs.excesses ? (
+            <OutputCard title="Excesses" text={outputs.excesses} />
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

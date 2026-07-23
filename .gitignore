@@ -7,3 +7,8 @@ dist
 *.tsbuildinfo
 .env*.local
 .claude/settings.local.json
+
+# Standalone apps being migrated into the suite. Reference material only:
+# they carry their own node_modules and .env.local files, so they must not
+# be committed here. Delete once each migration phase is complete.
+migration-source
