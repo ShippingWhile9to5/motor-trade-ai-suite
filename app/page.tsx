@@ -35,6 +35,11 @@ export default function Home() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ToolCard
+          href="/quote-tracker"
+          title="Quote Tracker"
+          description="Track every quote from submission to close on a kanban board, with amber/red flags when a quote needs chasing."
+        />
+        <ToolCard
           href="/composer"
           title="Submission Composer"
           description="Fill in the fact-find details to generate the Motor Trade and Material Damage additional information plus the underwriter email."

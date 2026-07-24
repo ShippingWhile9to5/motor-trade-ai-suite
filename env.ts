@@ -10,6 +10,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
   AI_PROVIDER_API_KEY: z.string().min(1),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 });
 
 const parsedEnv = envSchema.safeParse({
@@ -23,6 +25,8 @@ const parsedEnv = envSchema.safeParse({
     process.env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   AI_PROVIDER_API_KEY: process.env.AI_PROVIDER_API_KEY,
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
 });
 
 if (!parsedEnv.success) {
