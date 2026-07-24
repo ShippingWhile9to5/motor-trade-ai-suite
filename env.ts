@@ -12,6 +12,9 @@ const envSchema = z.object({
   AI_PROVIDER_API_KEY: z.string().min(1),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  // Optional: only the Prospect Finder needs it. Kept optional so a missing
+  // key breaks only that feature, not the whole app at boot.
+  COMPANIES_HOUSE_API_KEY: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse({
@@ -27,6 +30,7 @@ const parsedEnv = envSchema.safeParse({
   AI_PROVIDER_API_KEY: process.env.AI_PROVIDER_API_KEY,
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  COMPANIES_HOUSE_API_KEY: process.env.COMPANIES_HOUSE_API_KEY,
 });
 
 if (!parsedEnv.success) {

@@ -67,6 +67,22 @@ export async function findBusinessByName(
   return data ? parseRow(data) : null;
 }
 
+export async function findBusinessByCompanyNumber(
+  userId: string,
+  companyNumber: string,
+): Promise<Business | null> {
+  const { data, error } = await supabase
+    .from("business")
+    .select(businessSelect)
+    .eq("user_id", userId)
+    .eq("company_number", companyNumber)
+    .maybeSingle();
+
+  throwSupabaseError(error);
+
+  return data ? parseRow(data) : null;
+}
+
 export async function createBusiness(
   userId: string,
   input: CreateBusinessInput,

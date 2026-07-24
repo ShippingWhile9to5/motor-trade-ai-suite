@@ -156,17 +156,35 @@ export const fakeSupabase = {
   },
 };
 
-export function installFakeSupabase() {
+function overrideModule(relativePath: string, exports: unknown) {
   const path = require("node:path") as typeof import("node:path");
-  const supabaseModulePath = path.resolve(__dirname, "../../../lib/supabase.js");
+  const modulePath = path.resolve(__dirname, relativePath);
 
-  require.cache[supabaseModulePath] = {
-    id: supabaseModulePath,
-    path: path.dirname(supabaseModulePath),
-    exports: { supabase: fakeSupabase },
-    filename: supabaseModulePath,
+  require.cache[modulePath] = {
+    id: modulePath,
+    path: path.dirname(modulePath),
+    exports,
+    filename: modulePath,
     loaded: true,
     children: [],
     paths: [],
   } as unknown as NodeJS.Module;
+}
+
+export function installFakeSupabase() {
+  overrideModule("../../../lib/supabase.js", { supabase: fakeSupabase });
+}
+
+// Stand in for the validated env module so code that imports `env` directly
+// (e.g. external-service providers) loads in tests without real credentials.
+export function installFakeEnv(overrides: Record<string, string> = {}) {
+  overrideModule("../../../env.js", {
+    env: {
+      COMPANIES_HOUSE_API_KEY: "test_companies_house_key",
+      SUPABASE_URL: "http://localhost",
+      SUPABASE_SERVICE_ROLE_KEY: "test_service_role_key",
+      AI_PROVIDER_API_KEY: "test_ai_key",
+      ...overrides,
+    },
+  });
 }

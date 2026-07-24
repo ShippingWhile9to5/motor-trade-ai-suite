@@ -40,6 +40,11 @@ export default function Home() {
           description="Track every quote from submission to close on a kanban board, with amber/red flags when a quote needs chasing."
         />
         <ToolCard
+          href="/prospect-finder"
+          title="Prospect Finder"
+          description="Search Companies House by SIC code to find motor-trade firms and save them straight to your prospects."
+        />
+        <ToolCard
           href="/composer"
           title="Submission Composer"
           description="Fill in the fact-find details to generate the Motor Trade and Material Damage additional information plus the underwriter email."
