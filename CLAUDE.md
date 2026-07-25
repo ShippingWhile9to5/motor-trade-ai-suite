@@ -29,11 +29,13 @@ Nick's real-world workflow, and where each tool fits:
    urgency flags. Persisted.
 5. **`/prospect-finder` — Prospect Finder.** Companies House SIC search →
    save firms as prospects. Persisted.
-6. **`/prospect-board` — Prospect Board.** Every business you are working, in
-   one list: search, status filter, sort, and a "Due today" view driven by the
-   `follow_up` date. A prominent **Add prospect** button is the cold-call entry
-   point (name only is enough). Also imports a JSON backup from the old
-   standalone board. Persisted.
+6. **`/prospect-board` — Prospect Board.** Three tabs. **Pipeline** is the
+   working list of everything still live: search, status filter, sort, and a
+   "Due today" view driven by the `follow_up` date. A prominent **Add
+   prospect** button is the cold-call entry point (name only is enough). Also
+   imports a JSON backup from the old standalone board. **Won** shows deals
+   won, premium, commission and a commission-by-quarter chart (calendar
+   quarters). **Lost** lists the rest. Persisted.
 
 Planned (not built): **Phase 4** Home — Today view, reminders (including loose
 ones with no business attached), won/pipeline dashboard, export.
@@ -75,9 +77,13 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
   (`Sent to Client` / `Back to Insurer`) are the client-facing loop: the quote
   goes out, the client pushes back on price, it goes back to the insurer for a
   sharper number, and round again. Setting an outcome closes the quote and
-  silences its SLA flag. `initial_quoted_premium` is captured automatically the
-  first time a quoted price is entered, so a negotiated reduction does not
-  erase what the insurer first put up.
+  silences its SLA flag, and stamps `closed_at` — the date the win is reported
+  in, which `stage_entered_at` cannot be trusted for because moving the stage
+  afterwards would reset it. `initial_quoted_premium` is captured automatically
+  the first time a quoted price is entered, so a negotiated reduction does not
+  erase what the insurer first put up. `commission` is typed in by hand (Nick's
+  choice — it varies by insurer and scheme), so the Won tab counts how many
+  won deals are missing one rather than quietly understating the total.
 
 Creating a quote finds-or-creates the client by name and sets them to
 `quoting`; a `Won` outcome flips the business to `won`, `Lost`/`NTU` to `lost`.

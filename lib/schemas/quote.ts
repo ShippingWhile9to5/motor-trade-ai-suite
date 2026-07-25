@@ -18,6 +18,13 @@ export const quoteSchema = z.object({
   // negotiated reduction doesn't erase what it started at.
   initial_quoted_premium: z.number().nullable().default(null),
   outcome: quoteOutcomeSchema.nullable().default(null),
+  // Commission is typed in by hand — it varies by insurer and scheme, so it
+  // is not derived from the premium.
+  commission: z.number().nullable().default(null),
+  // Stamped when the outcome is set. stage_entered_at is not a safe substitute
+  // because moving the stage afterwards would reset it and shift the quarter
+  // a deal was won in.
+  closed_at: z.string().nullable().default(null),
   stage_entered_at: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -78,6 +85,7 @@ export const updateQuoteInputSchema = z.object({
   // Editable so a mistyped first figure can be corrected, but normally the
   // service fills this in on its own.
   initial_quoted_premium: optionalPremiumField,
+  commission: optionalPremiumField,
   outcome: quoteOutcomeSchema.nullable().optional(),
 });
 

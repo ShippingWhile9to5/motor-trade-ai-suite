@@ -20,6 +20,7 @@ import {
 } from "../repositories/businesses";
 import { findOrCreateBusinessByName } from "./businesses";
 import { CLOSED_STAGE } from "../quote-tracker";
+import { todayIso } from "../reporting";
 
 // Join each quote to its client's name from the shared business records,
 // so the board can show "Brookway Cars" without denormalising it onto quotes.
@@ -105,6 +106,12 @@ export async function updateQuoteWorkflow(
   // relying on a second click that is easy to forget.
   if (changes.outcome != null && changes.stage === undefined) {
     patch.stage = CLOSED_STAGE;
+  }
+
+  // Date the win the day it happens, so quarterly totals stay put even if the
+  // stage is moved afterwards. Clearing the outcome clears the date with it.
+  if (changes.outcome !== undefined && changes.outcome !== existing.outcome) {
+    patch.closed_at = changes.outcome === null ? null : todayIso();
   }
 
   // Moving to a new stage restarts the SLA clock for that stage.

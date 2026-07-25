@@ -24,11 +24,22 @@ import type {
   Business,
   BusinessPipelineStatus,
 } from "../../lib/schemas/business";
+import type { QuoteWithClient } from "../../lib/schemas/quote";
+import {
+  formatMoney,
+  quarterlyTotals,
+  sumWon,
+} from "../../lib/reporting";
 
 type ProspectBoardPanelProps = {
   businesses: Business[];
+  quotes: QuoteWithClient[];
   loadError: boolean;
 };
+
+// Won and lost firms are still prospects that reached the end, so they live
+// here rather than in a separate tool — just not mixed into the working list.
+type BoardTab = "pipeline" | "won" | "lost";
 
 const statusPill: Record<BusinessPipelineStatus, string> = {
   prospect: "bg-slate-100 text-slate-600",
@@ -673,12 +684,168 @@ function ProspectCard({
   );
 }
 
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "warn";
+}) {
+  return (
+    <div
+      className={`rounded-md border px-4 py-3 ${
+        tone === "warn"
+          ? "border-amber-300 bg-amber-50"
+          : "border-slate-200 bg-white"
+      }`}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-xl font-semibold ${
+          tone === "warn" ? "text-amber-900" : "text-slate-950"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// Bar heights are worked out in pixels rather than percentages: a percentage
+// height needs a parent with a definite height to resolve against, which a
+// flex column sized to its content does not have.
+const CHART_BAR_AREA = 112;
+
+function QuarterChart({ quotes }: { quotes: QuoteWithClient[] }) {
+  const series = quarterlyTotals(quotes);
+  const peak = Math.max(...series.map((period) => period.commission), 0);
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Commission by quarter
+      </p>
+      <div className="mt-4 flex items-end gap-3">
+        {series.map((period) => {
+          // A quarter with earnings always shows a bar, so a small one never
+          // looks identical to an empty one.
+          const height =
+            peak > 0 && period.commission > 0
+              ? Math.max(Math.round((period.commission / peak) * CHART_BAR_AREA), 4)
+              : 2;
+
+          return (
+            <div
+              key={period.key}
+              className="flex flex-1 flex-col items-center gap-2"
+              title={`${period.label}: ${formatMoney(period.commission)} from ${period.won} deal${period.won === 1 ? "" : "s"}`}
+            >
+              <span className="text-xs font-medium text-slate-600">
+                {period.commission > 0 ? formatMoney(period.commission) : ""}
+              </span>
+              <div
+                className={`w-full rounded-t ${
+                  period.commission > 0 ? "bg-emerald-500" : "bg-slate-200"
+                }`}
+                style={{ height: `${height}px` }}
+              />
+              <span className="text-xs text-slate-500">{period.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ClosedList({
+  businesses,
+  quotes,
+  outcomeLabel,
+}: {
+  businesses: Business[];
+  quotes: QuoteWithClient[];
+  outcomeLabel: "Won" | "Lost";
+}) {
+  if (businesses.length === 0) {
+    return (
+      <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
+        Nothing {outcomeLabel.toLowerCase()} yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+      <table className="w-full min-w-[36rem] text-left text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3 font-medium">Client</th>
+            <th className="px-4 py-3 font-medium">Insurer</th>
+            <th className="px-4 py-3 font-medium">Premium</th>
+            {outcomeLabel === "Won" ? (
+              <th className="px-4 py-3 font-medium">Commission</th>
+            ) : null}
+            <th className="px-4 py-3 font-medium">
+              {outcomeLabel === "Won" ? "Won" : "Closed"}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {businesses.map((business) => {
+            const quote = quotes.find(
+              (row) =>
+                row.business_id === business.id && row.outcome === outcomeLabel,
+            );
+
+            return (
+              <tr key={business.id} className="border-b border-slate-100 last:border-0">
+                <td className="px-4 py-3 font-medium text-slate-950">
+                  {business.name}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {quote?.insurer ?? "—"}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {quote?.quoted_premium != null
+                    ? formatMoney(quote.quoted_premium)
+                    : "—"}
+                </td>
+                {outcomeLabel === "Won" ? (
+                  <td className="px-4 py-3">
+                    {quote?.commission != null ? (
+                      <span className="text-slate-600">
+                        {formatMoney(quote.commission)}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700">Not recorded</span>
+                    )}
+                  </td>
+                ) : null}
+                <td className="px-4 py-3 text-slate-500">
+                  {quote?.closed_at ?? "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ProspectBoardPanel({
   businesses,
+  quotes,
   loadError,
 }: ProspectBoardPanelProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [tab, setTab] = useState<BoardTab>("pipeline");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<BusinessPipelineStatus | "">("");
   const [sort, setSort] = useState<BoardSort>("rating");
@@ -692,17 +859,33 @@ export function ProspectBoardPanel({
   }
 
   const today = todayIso();
-  const stats = useMemo(
-    () => getBoardStats(businesses, today),
-    [businesses, today],
+  // The working list is what is still live — won and lost have their own tabs
+  // rather than sitting at the bottom of everything you are chasing.
+  const working = useMemo(
+    () =>
+      businesses.filter(
+        (business) =>
+          business.pipeline_status !== "won" &&
+          business.pipeline_status !== "lost",
+      ),
+    [businesses],
   );
+  const closed = useMemo(
+    () => ({
+      won: businesses.filter((business) => business.pipeline_status === "won"),
+      lost: businesses.filter((business) => business.pipeline_status === "lost"),
+    }),
+    [businesses],
+  );
+  const wonTotals = useMemo(() => sumWon(quotes), [quotes]);
+  const stats = useMemo(() => getBoardStats(working, today), [working, today]);
   const visible = useMemo(
     () =>
       sortBusinesses(
-        filterBusinesses(businesses, { search, status, onlyDue }, today),
+        filterBusinesses(working, { search, status, onlyDue }, today),
         sort,
       ),
-    [businesses, search, status, onlyDue, sort, today],
+    [working, search, status, onlyDue, sort, today],
   );
 
   return (
@@ -744,9 +927,64 @@ export function ProspectBoardPanel({
         </div>
       ) : null}
 
+      <div className="flex gap-1 border-b border-slate-200">
+        {(
+          [
+            ["pipeline", `Pipeline (${working.length})`],
+            ["won", `Won (${closed.won.length})`],
+            ["lost", `Lost (${closed.lost.length})`],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium ${
+              tab === value
+                ? "border-slate-950 text-slate-950"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+            onClick={() => setTab(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab !== "pipeline" ? (
+        <>
+          {tab === "won" ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat label="Deals won" value={`${wonTotals.won}`} />
+                <Stat label="Premium" value={formatMoney(wonTotals.premium)} />
+                <Stat
+                  label="Commission"
+                  value={formatMoney(wonTotals.commission)}
+                />
+                {wonTotals.missingCommission > 0 ? (
+                  <Stat
+                    label="Missing commission"
+                    value={`${wonTotals.missingCommission}`}
+                    tone="warn"
+                  />
+                ) : null}
+              </div>
+              <QuarterChart quotes={quotes} />
+            </>
+          ) : null}
+          <ClosedList
+            businesses={closed[tab]}
+            quotes={quotes}
+            outcomeLabel={tab === "won" ? "Won" : "Lost"}
+          />
+        </>
+      ) : null}
+
+      {tab === "pipeline" ? (
+        <>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
         <span>
-          <b className="text-slate-950">{stats.total}</b> prospects
+          <b className="text-slate-950">{stats.total}</b> live
         </span>
         <span>
           <b className="text-slate-950">{stats.toContact}</b> to contact
@@ -763,9 +1001,6 @@ export function ProspectBoardPanel({
         ) : null}
         <span>
           <b className="text-slate-950">{stats.quoting}</b> quoting
-        </span>
-        <span>
-          <b className="text-slate-950">{stats.won}</b> won
         </span>
       </div>
 
@@ -796,7 +1031,11 @@ export function ProspectBoardPanel({
           }
         >
           <option value="">All statuses</option>
-          {PIPELINE_STATUSES.map((option) => (
+          {/* Won and lost have their own tabs, so offering them here would
+              only ever return nothing. */}
+          {PIPELINE_STATUSES.filter(
+            (option) => option !== "won" && option !== "lost",
+          ).map((option) => (
             <option key={option} value={option}>
               {PIPELINE_STATUS_LABELS[option]}
             </option>
@@ -838,7 +1077,7 @@ export function ProspectBoardPanel({
       {showImport ? <ImportPanel onDone={refresh} /> : null}
 
       <div className="flex flex-col gap-3">
-        {businesses.length === 0 ? (
+        {working.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
             No prospects yet. Use <b>Add prospect</b> after a cold call, save
             firms from the Prospect Finder, or import a backup.
@@ -865,6 +1104,8 @@ export function ProspectBoardPanel({
           ))
         )}
       </div>
+        </>
+      ) : null}
     </section>
   );
 }

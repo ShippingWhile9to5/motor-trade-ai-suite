@@ -210,6 +210,9 @@ function QuoteCard({
   const [quoted, setQuoted] = useState(
     quote.quoted_premium == null ? "" : String(quote.quoted_premium),
   );
+  const [commission, setCommission] = useState(
+    quote.commission == null ? "" : String(quote.commission),
+  );
   const urgency = getUrgency(quote.stage, quote.stage_entered_at, quote.outcome);
   const days = getDaysInStage(quote.stage_entered_at);
   // Only worth showing once a negotiation has actually moved the price.
@@ -235,6 +238,16 @@ function QuoteCard({
     }
 
     run(() => updateQuoteAction({ id: quote.id, quoted_premium: quoted }));
+  }
+
+  function commitCommission() {
+    const current = quote.commission == null ? "" : String(quote.commission);
+
+    if (commission.trim() === current) {
+      return;
+    }
+
+    run(() => updateQuoteAction({ id: quote.id, commission }));
   }
 
   return (
@@ -294,6 +307,27 @@ function QuoteCard({
           </p>
         ) : null}
       </div>
+
+      {/* Commission is typed in by hand, so it is asked for at the moment the
+          deal is won rather than left to be remembered later. */}
+      {quote.outcome === "Won" ? (
+        <label className="mt-2 block">
+          <span className="block text-xs text-slate-600">Commission £</span>
+          <input
+            type="number"
+            value={commission}
+            placeholder="0.00"
+            disabled={isPending}
+            className={`mt-1 min-h-9 w-full rounded-md border bg-white px-2 py-1 text-xs text-slate-950 ${
+              quote.commission == null
+                ? "border-amber-400"
+                : "border-slate-300"
+            }`}
+            onChange={(event) => setCommission(event.target.value)}
+            onBlur={commitCommission}
+          />
+        </label>
+      ) : null}
 
       <p className="mt-2 text-xs text-slate-500">
         {quote.outcome
