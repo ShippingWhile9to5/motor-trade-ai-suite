@@ -193,6 +193,12 @@ function AddQuoteForm({
   );
 }
 
+const outcomeBadge: Record<QuoteOutcome, string> = {
+  Won: "bg-emerald-100 text-emerald-700",
+  Lost: "bg-slate-200 text-slate-600",
+  NTU: "bg-slate-200 text-slate-600",
+};
+
 function QuoteCard({
   quote,
   onChanged,
@@ -201,14 +207,34 @@ function QuoteCard({
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const urgency = getUrgency(quote.stage, quote.stage_entered_at);
+  const [quoted, setQuoted] = useState(
+    quote.quoted_premium == null ? "" : String(quote.quoted_premium),
+  );
+  const urgency = getUrgency(quote.stage, quote.stage_entered_at, quote.outcome);
   const days = getDaysInStage(quote.stage_entered_at);
+  // Only worth showing once a negotiation has actually moved the price.
+  const reducedFrom =
+    quote.initial_quoted_premium != null &&
+    quote.quoted_premium != null &&
+    quote.initial_quoted_premium !== quote.quoted_premium
+      ? quote.initial_quoted_premium
+      : null;
 
   function run(action: () => Promise<unknown>) {
     startTransition(async () => {
       await action();
       onChanged();
     });
+  }
+
+  function commitQuoted() {
+    const current = quote.quoted_premium == null ? "" : String(quote.quoted_premium);
+
+    if (quoted.trim() === current) {
+      return;
+    }
+
+    run(() => updateQuoteAction({ id: quote.id, quoted_premium: quoted }));
   }
 
   return (
@@ -222,14 +248,22 @@ function QuoteCard({
             {quote.insurer} · {quote.quote_type}
           </p>
         </div>
-        <span
-          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${urgencyDot[urgency]}`}
-          title={
-            urgency === "none"
-              ? "On track"
-              : `${STAGE_ACTIONS[quote.stage]} — ${days} day${days === 1 ? "" : "s"} in stage`
-          }
-        />
+        {quote.outcome ? (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${outcomeBadge[quote.outcome]}`}
+          >
+            {quote.outcome}
+          </span>
+        ) : (
+          <span
+            className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${urgencyDot[urgency]}`}
+            title={
+              urgency === "none"
+                ? "On track"
+                : `${STAGE_ACTIONS[quote.stage]} — ${days} day${days === 1 ? "" : "s"} in stage`
+            }
+          />
+        )}
       </div>
 
       {quote.target_premium != null ? (
@@ -238,8 +272,33 @@ function QuoteCard({
         </p>
       ) : null}
 
+      <div className="mt-2">
+        <label className="block">
+          <span className="block text-xs text-slate-600">Quoted £</span>
+          <input
+            type="number"
+            value={quoted}
+            placeholder="0.00"
+            disabled={isPending}
+            className="mt-1 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
+            onChange={(event) => setQuoted(event.target.value)}
+            onBlur={commitQuoted}
+          />
+        </label>
+        {reducedFrom != null ? (
+          <p
+            className="mt-1 text-xs text-emerald-700"
+            title="What the insurer first quoted"
+          >
+            was £{reducedFrom.toFixed(2)}
+          </p>
+        ) : null}
+      </div>
+
       <p className="mt-2 text-xs text-slate-500">
-        {days} day{days === 1 ? "" : "s"} in stage
+        {quote.outcome
+          ? "Closed"
+          : `${days} day${days === 1 ? "" : "s"} in stage`}
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -303,7 +362,8 @@ export function QuoteBoard({ quotes, loadError }: QuoteBoardProps) {
   }
 
   const actionable = quotes.filter(
-    (quote) => getUrgency(quote.stage, quote.stage_entered_at) !== "none",
+    (quote) =>
+      getUrgency(quote.stage, quote.stage_entered_at, quote.outcome) !== "none",
   );
 
   return (
@@ -342,7 +402,7 @@ export function QuoteBoard({ quotes, loadError }: QuoteBoardProps) {
 
       <AddQuoteForm onCreated={refresh} />
 
-      <div className="grid gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {QUOTE_STAGES.map((stage) => {
           const stageQuotes = quotes.filter((quote) => quote.stage === stage);
 
@@ -364,7 +424,9 @@ export function QuoteBoard({ quotes, loadError }: QuoteBoardProps) {
                 ) : (
                   stageQuotes.map((quote) => (
                     <QuoteCard
-                      key={quote.id}
+                      // Remount on save so the premium box reflects what was
+                      // actually stored.
+                      key={`${quote.id}:${quote.updated_at}`}
                       quote={quote}
                       onChanged={refresh}
                     />

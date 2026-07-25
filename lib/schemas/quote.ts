@@ -9,11 +9,14 @@ export const quoteSchema = z.object({
   insurer: z.string(),
   quote_type: z.string(),
   submission_date: z.string(),
-  stage: z.number().int().min(1).max(5),
+  stage: z.number().int().min(1).max(6),
   notes: z.string().nullable().default(null),
   target_premium: z.number().nullable().default(null),
   last_year_premium: z.number().nullable().default(null),
   quoted_premium: z.number().nullable().default(null),
+  // The first price the insurer put up, captured automatically so a
+  // negotiated reduction doesn't erase what it started at.
+  initial_quoted_premium: z.number().nullable().default(null),
   outcome: quoteOutcomeSchema.nullable().default(null),
   stage_entered_at: z.string(),
   created_at: z.string(),
@@ -26,7 +29,7 @@ export const quoteWithClientSchema = quoteSchema.extend({
   client_name: z.string(),
 });
 
-const premiumField = z
+const premiumValue = z
   .union([z.number(), z.string(), z.null()])
   .transform((value) => {
     if (value === null || value === "") {
@@ -37,8 +40,16 @@ const premiumField = z
 
     return Number.isFinite(parsed) ? parsed : null;
   })
-  .nullable()
-  .default(null);
+  .nullable();
+
+const premiumField = premiumValue.default(null);
+
+// On an update, a field that was not supplied must stay undefined so it is
+// left alone. Applying .optional() to a schema that already carries
+// .default(null) would wrap the default rather than replace it, and an absent
+// key would parse to null — quietly wiping the premium it was not asked to
+// touch.
+const optionalPremiumField = premiumValue.optional();
 
 // The form supplies a client name; the service resolves it to a business
 // (creating one if needed), so the client is only ever entered once.
@@ -47,7 +58,7 @@ export const createQuoteInputSchema = z.object({
   insurer: z.string().trim().min(1, "Insurer is required."),
   quote_type: z.string().trim().default("New Business"),
   submission_date: z.string().trim().min(1, "Submission date is required."),
-  stage: z.number().int().min(1).max(5).default(1),
+  stage: z.number().int().min(1).max(6).default(1),
   notes: z.string().trim().nullable().default(null),
   target_premium: premiumField,
   last_year_premium: premiumField,
@@ -59,11 +70,14 @@ export const updateQuoteInputSchema = z.object({
   insurer: z.string().trim().min(1).optional(),
   quote_type: z.string().trim().optional(),
   submission_date: z.string().trim().min(1).optional(),
-  stage: z.number().int().min(1).max(5).optional(),
+  stage: z.number().int().min(1).max(6).optional(),
   notes: z.string().trim().nullable().optional(),
-  target_premium: premiumField.optional(),
-  last_year_premium: premiumField.optional(),
-  quoted_premium: premiumField.optional(),
+  target_premium: optionalPremiumField,
+  last_year_premium: optionalPremiumField,
+  quoted_premium: optionalPremiumField,
+  // Editable so a mistyped first figure can be corrected, but normally the
+  // service fills this in on its own.
+  initial_quoted_premium: optionalPremiumField,
   outcome: quoteOutcomeSchema.nullable().optional(),
 });
 

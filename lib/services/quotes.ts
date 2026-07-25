@@ -19,6 +19,7 @@ import {
   updateBusinessPipelineStatus,
 } from "../repositories/businesses";
 import { findOrCreateBusinessByName } from "./businesses";
+import { CLOSED_STAGE } from "../quote-tracker";
 
 // Join each quote to its client's name from the shared business records,
 // so the board can show "Brookway Cars" without denormalising it onto quotes.
@@ -64,6 +65,7 @@ export async function createQuoteWorkflow(
     target_premium: data.target_premium,
     last_year_premium: data.last_year_premium,
     quoted_premium: data.quoted_premium,
+    initial_quoted_premium: data.quoted_premium,
   });
 
   return { ...quote, client_name: business.name };
@@ -82,10 +84,33 @@ export async function updateQuoteWorkflow(
     return null;
   }
 
-  const patch: Record<string, unknown> = { ...changes };
+  // Only write what was actually supplied. A key that arrives undefined must
+  // never reach the update, or it would overwrite a stored value with nothing.
+  const patch: Record<string, unknown> = Object.fromEntries(
+    Object.entries(changes).filter(([, value]) => value !== undefined),
+  );
+
+  // The first price the insurer puts up is recorded once, without the broker
+  // having to type it twice — later reductions overwrite quoted_premium only,
+  // so what it started at survives the haggling.
+  if (
+    changes.quoted_premium != null &&
+    changes.initial_quoted_premium === undefined &&
+    existing.initial_quoted_premium == null
+  ) {
+    patch.initial_quoted_premium = changes.quoted_premium;
+  }
+
+  // An outcome means the quote is finished, so it closes itself rather than
+  // relying on a second click that is easy to forget.
+  if (changes.outcome != null && changes.stage === undefined) {
+    patch.stage = CLOSED_STAGE;
+  }
 
   // Moving to a new stage restarts the SLA clock for that stage.
-  if (changes.stage !== undefined && changes.stage !== existing.stage) {
+  const nextStage = patch.stage as number | undefined;
+
+  if (nextStage !== undefined && nextStage !== existing.stage) {
     patch.stage_entered_at = new Date().toISOString();
   }
 

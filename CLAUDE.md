@@ -70,8 +70,14 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
   `(user_id, company_number)` is the dedup guard, so only a real Companies
   House number belongs in that column — `splitCompanyNumber()` keeps free text
   out of it on import.
-- **`quote`** — belongs to a business: insurer, type, submission date, 5-stage
-  pipeline, premiums, outcome, `stage_entered_at` (the SLA clock).
+- **`quote`** — belongs to a business: insurer, type, submission date, 6-stage
+  pipeline, premiums, outcome, `stage_entered_at` (the SLA clock). Stages 4–5
+  (`Sent to Client` / `Back to Insurer`) are the client-facing loop: the quote
+  goes out, the client pushes back on price, it goes back to the insurer for a
+  sharper number, and round again. Setting an outcome closes the quote and
+  silences its SLA flag. `initial_quoted_premium` is captured automatically the
+  first time a quoted price is entered, so a negotiated reduction does not
+  erase what the insurer first put up.
 
 Creating a quote finds-or-creates the client by name and sets them to
 `quoting`; a `Won` outcome flips the business to `won`, `Lost`/`NTU` to `lost`.

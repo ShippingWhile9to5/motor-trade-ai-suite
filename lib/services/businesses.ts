@@ -37,7 +37,13 @@ export async function updateBusinessWorkflow(
   userId: string,
   input: unknown,
 ): Promise<Business | null> {
-  const { id, ...changes } = updateBusinessInputSchema.parse(input);
+  const { id, ...parsed } = updateBusinessInputSchema.parse(input);
+
+  // Write only what was supplied, so a single-field edit cannot blank the
+  // fields it never touched.
+  const changes = Object.fromEntries(
+    Object.entries(parsed).filter(([, value]) => value !== undefined),
+  );
 
   // Nothing to write: return the record as it stands, so a no-op edit is not
   // reported to the caller as a missing record.

@@ -31,11 +31,173 @@ test("quote tracker: pure SLA urgency engine", () => {
   assert.equal(getUrgency(3, daysAgo(0)), "none");
   assert.equal(getUrgency(3, daysAgo(1)), "amber");
   assert.equal(getUrgency(3, daysAgo(2)), "red");
-  // Stage 4: amber at 3, red at 5.
+  // Stage 4, with the client: amber at 3, red at 5.
   assert.equal(getUrgency(4, daysAgo(3)), "amber");
   assert.equal(getUrgency(4, daysAgo(5)), "red");
+  // Stage 5, back with the insurer for a revised price: same thresholds.
+  assert.equal(getUrgency(5, daysAgo(3)), "amber");
+  assert.equal(getUrgency(5, daysAgo(5)), "red");
   // Closed is never urgent.
-  assert.equal(getUrgency(5, daysAgo(99)), "none");
+  assert.equal(getUrgency(6, daysAgo(99)), "none");
+  // Neither is a quote that already has an outcome, wherever it sits.
+  assert.equal(getUrgency(3, daysAgo(99), "Won"), "none");
+  assert.equal(getUrgency(4, daysAgo(99), "Lost"), "none");
+  assert.equal(getUrgency(4, daysAgo(99), null), "red");
+});
+
+test("an outcome closes the quote and stops it asking to be chased", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+  const { getUrgency, CLOSED_STAGE } = require(
+    "../../lib/quote-tracker",
+  ) as typeof import("../../lib/quote-tracker");
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+  });
+
+  // Sitting in "Sent to Client", well past the red threshold.
+  await updateQuoteWorkflow(USER, { id: quote.id, stage: 4 });
+  store.quote[0].stage_entered_at = new Date(
+    Date.now() - 20 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const won = await updateQuoteWorkflow(USER, { id: quote.id, outcome: "Won" });
+
+  assert.equal(won?.stage, CLOSED_STAGE, "a won quote closes itself");
+  assert.equal(
+    getUrgency(won!.stage, won!.stage_entered_at, won!.outcome),
+    "none",
+    "and stops nagging",
+  );
+});
+
+test("an explicit stage wins over the automatic close", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+  });
+
+  const updated = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    outcome: "Won",
+    stage: 3,
+  });
+
+  assert.equal(updated?.stage, 3);
+});
+
+test("the first quoted price is kept when a negotiation reduces it", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+  });
+
+  const first = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    quoted_premium: "4500",
+  });
+
+  assert.equal(first?.quoted_premium, 4500);
+  assert.equal(first?.initial_quoted_premium, 4500, "captured without retyping");
+
+  const reduced = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    quoted_premium: "3800",
+  });
+
+  assert.equal(reduced?.quoted_premium, 3800);
+  assert.equal(
+    reduced?.initial_quoted_premium,
+    4500,
+    "the haggling does not erase what it started at",
+  );
+
+  // A second reduction still leaves the original alone.
+  const again = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    quoted_premium: "3600",
+  });
+
+  assert.equal(again?.initial_quoted_premium, 4500);
+});
+
+test("editing one field leaves the other premiums alone", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+    target_premium: "3200",
+    last_year_premium: "2900",
+  });
+
+  // Changing the stage must not disturb figures it was never given.
+  const moved = await updateQuoteWorkflow(USER, { id: quote.id, stage: 3 });
+
+  assert.equal(moved?.target_premium, 3200);
+  assert.equal(moved?.last_year_premium, 2900);
+
+  const closed = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    outcome: "Won",
+  });
+
+  assert.equal(closed?.target_premium, 3200);
+  assert.equal(closed?.last_year_premium, 2900);
+});
+
+test("a premium can still be deliberately cleared", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+    target_premium: "3200",
+  });
+
+  const cleared = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    target_premium: "",
+  });
+
+  assert.equal(cleared?.target_premium, null, "an emptied box still clears it");
+});
+
+test("a mistyped first price can be corrected by hand", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+    quoted_premium: "450",
+  });
+
+  assert.equal(quote.initial_quoted_premium, 450);
+
+  const fixed = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    quoted_premium: "4500",
+    initial_quoted_premium: "4500",
+  });
+
+  assert.equal(fixed?.initial_quoted_premium, 4500);
 });
 
 test("creating a quote creates the client and sets it to quoting", async () => {
