@@ -28,12 +28,18 @@ export default function Home() {
           Motor Trade AI Suite
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          Two standalone tools. Nothing you enter is saved - each one is a
-          fill-in, copy-out step you use once per case.
+          Your pipeline plus the two generation tools. Prospects and quotes are
+          saved; Composer and Policy Letter stay in the browser and keep no
+          record of the risk detail you paste in.
         </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <ToolCard
+          href="/prospect-board"
+          title="Prospect Board"
+          description="Every firm you are working, from first cold call to won, with call-back dates that flag themselves when they fall due."
+        />
         <ToolCard
           href="/quote-tracker"
           title="Quote Tracker"

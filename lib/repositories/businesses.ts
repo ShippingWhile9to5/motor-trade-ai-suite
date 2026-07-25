@@ -102,6 +102,37 @@ export async function createBusiness(
   return parseRow(data);
 }
 
+export async function updateBusiness(
+  userId: string,
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<Business | null> {
+  const { data, error } = await supabase
+    .from("business")
+    .update(patch)
+    .eq("user_id", userId)
+    .eq("id", id)
+    .select(businessSelect)
+    .maybeSingle();
+
+  throwSupabaseError(error);
+
+  return data ? parseRow(data) : null;
+}
+
+export async function deleteBusiness(
+  userId: string,
+  id: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("business")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", id);
+
+  throwSupabaseError(error);
+}
+
 export async function updateBusinessPipelineStatus(
   userId: string,
   id: string,

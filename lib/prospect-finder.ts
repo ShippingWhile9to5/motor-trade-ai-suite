@@ -57,6 +57,7 @@ export function companyToBusinessInput(
     approach_angle: null,
     rating: null,
     pipeline_status: "prospect",
+    follow_up: null,
     notes: null,
     source: "finder",
   };

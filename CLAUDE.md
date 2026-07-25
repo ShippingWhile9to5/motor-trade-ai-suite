@@ -29,12 +29,14 @@ Nick's real-world workflow, and where each tool fits:
    urgency flags. Persisted.
 5. **`/prospect-finder` — Prospect Finder.** Companies House SIC search →
    save firms as prospects. Persisted.
+6. **`/prospect-board` — Prospect Board.** Every business you are working, in
+   one list: search, status filter, sort, and a "Due today" view driven by the
+   `follow_up` date. A prominent **Add prospect** button is the cold-call entry
+   point (name only is enough). Also imports a JSON backup from the old
+   standalone board. Persisted.
 
-Planned (not built): **Phase 3** Prospect Board (+ import of 19 records from
-`migration-source/prospects-backup-2026-07-21.json`, and a prominent manual
-"Add prospect" for cold calls); **Phase 4** Home — Today view, reminders
-(including loose ones with no business attached), won/pipeline dashboard,
-export.
+Planned (not built): **Phase 4** Home — Today view, reminders (including loose
+ones with no business attached), won/pipeline dashboard, export.
 
 ## Commands
 
@@ -53,7 +55,7 @@ export.
 - `lib/services` — business flow / orchestration
 - `lib/providers` — external integrations (Claude extraction, Companies House)
 - `lib/*.ts` — pure logic (`submission-composer.ts`, `policy-letter.ts`,
-  `quote-tracker.ts`, `prospect-finder.ts`)
+  `quote-tracker.ts`, `prospect-finder.ts`, `prospect-board.ts`)
 - `app/` — UI (server components/actions) only; no business or DB logic here
 
 ## Data model
@@ -63,8 +65,11 @@ as a prospect (from the Finder or a manual add) and the *same* row carries
 through `prospect → contacted → quoting → won/lost`. A client is entered once.
 
 - **`business`** — name, Companies House details, contact info, rating,
-  `pipeline_status`, `source` (`manual` | `finder` | `import`). Unique index on
-  `(user_id, company_number)` is the dedup guard.
+  `pipeline_status`, `follow_up` (the Prospect Board's call-back date),
+  `source` (`manual` | `finder` | `import`). Unique index on
+  `(user_id, company_number)` is the dedup guard, so only a real Companies
+  House number belongs in that column — `splitCompanyNumber()` keeps free text
+  out of it on import.
 - **`quote`** — belongs to a business: insurer, type, submission date, 5-stage
   pipeline, premiums, outcome, `stage_entered_at` (the SLA clock).
 

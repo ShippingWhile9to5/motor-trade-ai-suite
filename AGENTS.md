@@ -17,9 +17,11 @@ Built:
 3. **Quote Tracker** (`/quote-tracker`) — kanban pipeline with SLA urgency.
 4. **Prospect Finder** (`/prospect-finder`) — Companies House SIC search →
    save as prospects.
+5. **Prospect Board** (`/prospect-board`) — the working list of every business:
+   search, filter, sort, call-back dates with due/overdue flags, a prominent
+   manual add for cold calls, and JSON import from the old standalone board.
 
-Planned: Prospect Board + import (Phase 3); Home with Today view, reminders,
-dashboard and export (Phase 4).
+Planned: Home with Today view, reminders, dashboard and export (Phase 4).
 
 Build only what is requested. Do not build future scope.
 
