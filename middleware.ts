@@ -6,6 +6,7 @@ const isProtectedRoute = createRouteMatcher([
   "/policy-letter(.*)",
   "/quote-tracker(.*)",
   "/prospect-finder(.*)",
+  "/prospect-board(.*)",
 ]);
 
 // Clerk's current App Router guidance uses proxy.ts for Next 16+.
