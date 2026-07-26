@@ -19,8 +19,8 @@ import {
   BoardIcon,
   ClockIcon,
   ComposerIcon,
-  LetterIcon,
   PhoneIcon,
+  ScheduleIcon,
   SearchIcon,
   TrackerIcon,
 } from "./icons";
@@ -68,10 +68,10 @@ const TOOLS = [
   {
     href: "/policy-letter",
     step: "05",
-    Icon: LetterIcon,
-    title: "Policy Letter Generator",
+    Icon: ScheduleIcon,
+    title: "Policy Schedule Reader",
     description:
-      "Read the policy schedule and pull out the endorsements, conditions, exclusions and excesses for the client letter.",
+      "Pull the endorsements, conditions, significant exclusions and excesses out of the insurer's schedule, ready to paste into Acturis and the client letter.",
   },
 ] as const;
 

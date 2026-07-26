@@ -11,7 +11,7 @@ Built:
 
 1. **Submission Composer** (`/composer`) — manual form → additional-information
    text + underwriter email. Deterministic, no AI, nothing saved.
-2. **Policy Letter Generator** (`/policy-letter`) — policy schedule PDF → AI
+2. **Policy Schedule Reader** (`/policy-letter`) — policy schedule PDF → AI
    extraction → human review → opening paragraph + three copy-out blocks.
    Nothing saved.
 3. **Quote Tracker** (`/quote-tracker`) — kanban pipeline with SLA urgency.
@@ -92,7 +92,7 @@ Do not move that line without an explicit decision from Nick.
 
 ## File Upload Rules
 
-Policy Letter Generator accepts PDF only. Validate MIME type, file size
+Policy Schedule Reader accepts PDF only. Validate MIME type, file size
 (max 10MB), and empty files before sending to the AI provider.
 
 ## Workflow

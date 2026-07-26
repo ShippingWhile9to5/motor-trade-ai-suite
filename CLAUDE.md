@@ -19,7 +19,9 @@ Nick's real-world workflow, and where each tool fits:
 2. **`/composer` — Submission Composer.** Manual form → deterministic template
    outputs: Motor Trade + Material Damage additional-information text and the
    underwriter email. No AI call, nothing saved.
-3. **`/policy-letter` — Policy Letter Generator.** After a quote is accepted:
+3. **`/policy-letter` — Policy Schedule Reader.** (Route kept as
+   `/policy-letter`; it was renamed because it never wrote a letter.) After a
+   quote is accepted:
    upload the insurer's policy schedule PDF → Claude extracts endorsements /
    conditions / exclusions / excesses (verbatim, preserving codes like
    `MD050 - Flood exclusion`) → broker reviews and edits → generates the

@@ -63,11 +63,18 @@ export function TrackerIcon(props: IconProps) {
   );
 }
 
-export function LetterIcon(props: IconProps) {
+// A document being read, not an envelope — the tool pulls figures out of the
+// insurer's schedule rather than sending anything.
+export function ScheduleIcon(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="m3.5 7 8.5 6 8.5-6" />
+      {/* Closed document outline, with the magnifier clear of it so both
+          shapes still read at 18px. */}
+      <path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h5" />
+      <path d="M13 3l5 5v4" />
+      <path d="M13 3v5h5" />
+      <circle cx="16" cy="17" r="3" />
+      <path d="m18.3 19.3 2 2" />
     </Svg>
   );
 }

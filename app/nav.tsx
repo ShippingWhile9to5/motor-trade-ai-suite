@@ -6,7 +6,7 @@ import {
   BoardIcon,
   ComposerIcon,
   HomeIcon,
-  LetterIcon,
+  ScheduleIcon,
   SearchIcon,
   TrackerIcon,
 } from "./icons";
@@ -17,7 +17,7 @@ const LINKS = [
   { href: "/prospect-board", label: "Board", Icon: BoardIcon },
   { href: "/composer", label: "Composer", Icon: ComposerIcon },
   { href: "/quote-tracker", label: "Quotes", Icon: TrackerIcon },
-  { href: "/policy-letter", label: "Letter", Icon: LetterIcon },
+  { href: "/policy-letter", label: "Schedule", Icon: ScheduleIcon },
 ] as const;
 
 export function Nav({ children }: { children?: React.ReactNode }) {

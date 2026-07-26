@@ -254,13 +254,13 @@ export function PolicyLetterPanel() {
       <header className="space-y-3">
         <div>
           <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
-            Policy Letter Generator
+            Policy Schedule Reader
           </h1>
           <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-            Upload the policy schedule once a quote is accepted, review the
-            extracted endorsements/conditions/exclusions/excesses, add the
-            quote details, then copy each block into Acturis. Nothing here is
-            saved.
+            Upload the insurer&rsquo;s schedule once a quote is accepted. It
+            pulls out the endorsements, conditions, significant exclusions and
+            excesses word for word, you check them, and it builds the blocks to
+            paste into Acturis and the client letter. Nothing here is saved.
           </p>
         </div>
       </header>
@@ -474,11 +474,11 @@ export function PolicyLetterPanel() {
           onClick={handleGenerateLetter}
           disabled={!canGenerateLetter}
         >
-          Generate Letter
+          Build the copy-out blocks
         </button>
         {!canGenerateLetter ? (
           <p className="text-sm text-slate-500">
-            Select or type a driver basis, and set the quote date, to generate.
+            Select or type a driver basis, and set the quote date, to build them.
           </p>
         ) : null}
       </div>
