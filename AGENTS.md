@@ -77,7 +77,13 @@ Do not move that line without an explicit decision from Nick.
   server actions).
 - Do not rely on client-side checks for protected actions.
 - The Supabase service-role key bypasses RLS, so **every repository query must
-  be scoped by `user_id`**.
+  be scoped by `user_id`** — that filter is currently the only thing keeping
+  one user's pipeline out of another's. `tests/integration/data-isolation.test.ts`
+  enforces this structurally: it fails if any query is unscoped, if a
+  repository function omits `userId`, or if anything outside `lib/repositories`
+  imports the Supabase client. Do not weaken those tests to make a change pass.
+- Database-enforced RLS (Clerk as a Supabase third-party auth provider) is the
+  belt-and-braces, and is the job to do before this is used by a team.
 - Do not log client data, uploaded files, prompts, or secret values.
 
 ## AI / Extraction Rules
