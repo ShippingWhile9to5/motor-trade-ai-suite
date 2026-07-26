@@ -22,8 +22,9 @@ export const createReminderInputSchema = z.object({
   body: z.string().trim().min(1, "What is the reminder?"),
   due_date: isoDate,
   business_id: z
-    .union([z.string().uuid(), z.literal(""), z.null(), z.undefined()])
-    .transform((value) => (value ? value : null)),
+    .union([z.string().uuid(), z.literal(""), z.null()])
+    .optional()
+    .transform((value) => value || null),
 });
 
 export const updateReminderInputSchema = z.object({

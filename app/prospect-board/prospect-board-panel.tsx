@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -471,6 +472,14 @@ function ProspectCard({
               save({ follow_up: event.target.value });
             }}
           />
+          {/* Attaches the quote to this exact firm, so the Quote Tracker
+              doesn't have to match a typed name. */}
+          <Link
+            href={`/quote-tracker?business=${business.id}`}
+            className="min-h-9 shrink-0 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-800 hover:bg-brand-100"
+          >
+            Quote
+          </Link>
           <DeleteButton
             size="small"
             disabled={isPending}
@@ -881,13 +890,23 @@ function ClosedRow({
         </td>
       ) : null}
       <td className="px-4 py-3 text-slate-500">{quote?.closed_at ?? "—"}</td>
-      <td className="px-4 py-3 text-right">
-        <DeleteButton
-          size="small"
-          disabled={isPending}
-          quoteCount={quoteCount}
-          onConfirm={handleDelete}
-        />
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-2">
+          {/* A won client comes round again at renewal, and that is a new
+              quote on the same firm. */}
+          <Link
+            href={`/quote-tracker?business=${business.id}`}
+            className="min-h-9 shrink-0 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-800 hover:bg-brand-100"
+          >
+            {outcomeLabel === "Won" ? "Renew" : "Re-quote"}
+          </Link>
+          <DeleteButton
+            size="small"
+            disabled={isPending}
+            quoteCount={quoteCount}
+            onConfirm={handleDelete}
+          />
+        </div>
       </td>
     </tr>
   );

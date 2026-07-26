@@ -58,19 +58,29 @@ const premiumField = premiumValue.default(null);
 // touch.
 const optionalPremiumField = premiumValue.optional();
 
-// The form supplies a client name; the service resolves it to a business
-// (creating one if needed), so the client is only ever entered once.
-export const createQuoteInputSchema = z.object({
-  client_name: z.string().trim().min(1, "Client name is required."),
-  insurer: z.string().trim().min(1, "Insurer is required."),
-  quote_type: z.string().trim().default("New Business"),
-  submission_date: z.string().trim().min(1, "Submission date is required."),
-  stage: z.number().int().min(1).max(6).default(1),
-  notes: z.string().trim().nullable().default(null),
-  target_premium: premiumField,
-  last_year_premium: premiumField,
-  quoted_premium: premiumField,
-});
+// Either pick an existing firm by id, or type a name for one that isn't on
+// the board yet. Picking by id is what the board's "Quote" button uses, and it
+// removes the chance of a near-miss name creating a duplicate firm.
+export const createQuoteInputSchema = z
+  .object({
+    business_id: z
+      .union([z.string().uuid(), z.literal(""), z.null()])
+      .optional()
+      .transform((value) => value || null),
+    client_name: z.string().trim().default(""),
+    insurer: z.string().trim().min(1, "Insurer is required."),
+    quote_type: z.string().trim().default("New Business"),
+    submission_date: z.string().trim().min(1, "Submission date is required."),
+    stage: z.number().int().min(1).max(6).default(1),
+    notes: z.string().trim().nullable().default(null),
+    target_premium: premiumField,
+    last_year_premium: premiumField,
+    quoted_premium: premiumField,
+  })
+  .refine((data) => data.business_id !== null || data.client_name !== "", {
+    message: "Pick a client, or type a name for a new one.",
+    path: ["client_name"],
+  });
 
 export const updateQuoteInputSchema = z.object({
   id: z.string().uuid(),

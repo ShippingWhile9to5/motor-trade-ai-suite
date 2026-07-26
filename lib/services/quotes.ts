@@ -46,11 +46,18 @@ export async function createQuoteWorkflow(
 ): Promise<QuoteWithClient> {
   const data = createQuoteInputSchema.parse(input);
 
-  // Find or create the client, and mark them as in the quoting stage of the
-  // pipeline (unless they're already further along, e.g. won).
-  const business = await findOrCreateBusinessByName(userId, data.client_name, {
-    pipeline_status: "quoting",
-  });
+  // A picked firm attaches by id, which is exact. A typed name falls back to
+  // find-or-create, which matches on the name and so can only ever be as good
+  // as the spelling.
+  const business = data.business_id
+    ? await getBusinessById(userId, data.business_id)
+    : await findOrCreateBusinessByName(userId, data.client_name, {
+        pipeline_status: "quoting",
+      });
+
+  if (!business) {
+    throw new Error("That client could not be found.");
+  }
 
   if (business.pipeline_status === "prospect" || business.pipeline_status === "contacted") {
     await updateBusinessPipelineStatus(userId, business.id, "quoting");

@@ -45,6 +45,94 @@ test("quote tracker: pure SLA urgency engine", () => {
   assert.equal(getUrgency(4, daysAgo(99), null), "red");
 });
 
+test("picking a firm attaches the quote to that exact record", async () => {
+  resetStore();
+  const { createQuoteWorkflow, createBusinessWorkflow, listBusinessesWorkflow } =
+    loadServices();
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Croxdale Service Station Limited (Croxdale Group)",
+    pipeline_status: "contacted",
+  });
+
+  const quote = await createQuoteWorkflow(USER, {
+    business_id: firm.id,
+    insurer: "NIG",
+    submission_date: "2026-07-26",
+  });
+
+  assert.equal(quote.business_id, firm.id);
+  assert.equal(quote.client_name, firm.name);
+
+  const businesses = await listBusinessesWorkflow(USER);
+  assert.equal(businesses.length, 1, "no second firm was created");
+  assert.equal(businesses[0].pipeline_status, "quoting");
+});
+
+test("a typed name that nearly matches would have made a duplicate", async () => {
+  resetStore();
+  const { createQuoteWorkflow, createBusinessWorkflow, listBusinessesWorkflow } =
+    loadServices();
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Croxdale Service Station Limited (Croxdale Group)",
+  });
+
+  // The old behaviour, kept for a client who genuinely isn't on the board.
+  await createQuoteWorkflow(USER, {
+    client_name: "Croxdale Service Station",
+    insurer: "NIG",
+    submission_date: "2026-07-26",
+  });
+
+  assert.equal(
+    (await listBusinessesWorkflow(USER)).length,
+    2,
+    "which is exactly why the picker exists",
+  );
+
+  // Picking the firm instead reuses it.
+  await createQuoteWorkflow(USER, {
+    business_id: firm.id,
+    insurer: "Covea",
+    submission_date: "2026-07-26",
+  });
+
+  assert.equal((await listBusinessesWorkflow(USER)).length, 2);
+});
+
+test("you cannot attach a quote to someone else's client", async () => {
+  resetStore();
+  const { createQuoteWorkflow, createBusinessWorkflow } = loadServices();
+
+  const theirs = await createBusinessWorkflow("user_other", {
+    name: "Not Yours Ltd",
+  });
+
+  await assert.rejects(
+    () =>
+      createQuoteWorkflow(USER, {
+        business_id: theirs.id,
+        insurer: "NIG",
+        submission_date: "2026-07-26",
+      }),
+    /could not be found/,
+  );
+});
+
+test("a quote needs either a picked firm or a typed name", async () => {
+  const { createQuoteWorkflow } = loadServices();
+
+  await assert.rejects(
+    () =>
+      createQuoteWorkflow(USER, {
+        insurer: "NIG",
+        submission_date: "2026-07-26",
+      }),
+    /Pick a client/,
+  );
+});
+
 test("an outcome closes the quote and stops it asking to be chased", async () => {
   resetStore();
   const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();

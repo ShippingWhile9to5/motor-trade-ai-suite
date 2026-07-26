@@ -21,11 +21,17 @@ import type {
   QuoteOutcome,
   QuoteWithClient,
 } from "../../lib/schemas/quote";
+import type { Business } from "../../lib/schemas/business";
 
 type QuoteBoardProps = {
   quotes: QuoteWithClient[];
+  businesses: Business[];
+  preselectBusinessId: string | null;
   loadError: boolean;
 };
+
+// Sentinel for the "not on my board yet" option in the client picker.
+const NEW_CLIENT = "__new__";
 
 const OUTCOMES: QuoteOutcome[] = ["Won", "Lost", "NTU"];
 
@@ -35,6 +41,7 @@ function todayIso(): string {
 }
 
 const emptyForm = {
+  business_id: "",
   client_name: "",
   insurer: "",
   quote_type: "New Business",
@@ -50,13 +57,22 @@ const urgencyDot: Record<UrgencyLevel, string> = {
 };
 
 function AddQuoteForm({
+  businesses,
+  preselectBusinessId,
   onCreated,
 }: {
+  businesses: Business[];
+  preselectBusinessId: string | null;
   onCreated: () => void;
 }) {
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    business_id: preselectBusinessId ?? "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const sorted = [...businesses].sort((a, b) => a.name.localeCompare(b.name));
+  const addingNew = form.business_id === NEW_CLIENT;
 
   function update<Key extends keyof typeof form>(key: Key, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -67,7 +83,8 @@ function AddQuoteForm({
     startTransition(async () => {
       try {
         await createQuoteAction({
-          client_name: form.client_name,
+          business_id: addingNew ? "" : form.business_id,
+          client_name: addingNew ? form.client_name : "",
           insurer: form.insurer,
           quote_type: form.quote_type,
           submission_date: form.submission_date,
@@ -86,10 +103,11 @@ function AddQuoteForm({
     });
   }
 
+  const hasClient = addingNew
+    ? form.client_name.trim() !== ""
+    : form.business_id !== "";
   const canSubmit =
-    form.client_name.trim() !== "" &&
-    form.insurer !== "" &&
-    form.submission_date !== "";
+    hasClient && form.insurer !== "" && form.submission_date !== "";
 
   return (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
@@ -99,15 +117,33 @@ function AddQuoteForm({
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">
-            Client name
+            Client
           </span>
-          <input
-            type="text"
-            value={form.client_name}
-            placeholder="e.g. Brookway Cars Ltd"
+          {/* Picked by id, so a firm already on the board can't be duplicated
+              by a near-miss spelling. */}
+          <select
+            value={form.business_id}
             className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-            onChange={(event) => update("client_name", event.target.value)}
-          />
+            onChange={(event) => update("business_id", event.target.value)}
+          >
+            <option value="">Select a client</option>
+            {sorted.map((business) => (
+              <option key={business.id} value={business.id}>
+                {business.name}
+              </option>
+            ))}
+            <option value={NEW_CLIENT}>+ Not on my board yet</option>
+          </select>
+          {addingNew ? (
+            <input
+              type="text"
+              autoFocus
+              value={form.client_name}
+              placeholder="e.g. Brookway Cars Ltd"
+              className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) => update("client_name", event.target.value)}
+            />
+          ) : null}
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">
@@ -409,7 +445,12 @@ function QuoteCard({
   );
 }
 
-export function QuoteBoard({ quotes, loadError }: QuoteBoardProps) {
+export function QuoteBoard({
+  quotes,
+  businesses,
+  preselectBusinessId,
+  loadError,
+}: QuoteBoardProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -450,7 +491,11 @@ export function QuoteBoard({ quotes, loadError }: QuoteBoardProps) {
         </div>
       ) : null}
 
-      <AddQuoteForm onCreated={refresh} />
+      <AddQuoteForm
+        businesses={businesses}
+        preselectBusinessId={preselectBusinessId}
+        onCreated={refresh}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {QUOTE_STAGES.map((stage) => {
