@@ -37,8 +37,12 @@ Nick's real-world workflow, and where each tool fits:
    won, premium, commission and a commission-by-quarter chart (calendar
    quarters). **Lost** lists the rest. Persisted.
 
-Planned (not built): **Phase 4** Home — Today view, reminders (including loose
-ones with no business attached), won/pipeline dashboard, export.
+7. **`/` — Home.** The **Today** view: reminders, call-backs due from the
+   board, and quotes past their SLA, overdue first. **Add reminder** takes a
+   date and an *optional* firm, so a cold call to someone not yet logged still
+   gets a reminder. **Top 5 for the meeting** formats the most advanced live
+   deals as plain text with a Copy button — for the monthly sales meeting,
+   pasted into Word or an email. Below that, the five tools in workflow order.
 
 ## Commands
 
@@ -84,6 +88,11 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
   erase what the insurer first put up. `commission` is typed in by hand (Nick's
   choice — it varies by insurer and scheme), so the Won tab counts how many
   won deals are missing one rather than quietly understating the total.
+
+- **`reminder`** — body, `due_date`, `done`, and an **optional** `business_id`
+  (`on delete set null`, not cascade — deleting a firm must not silently bin
+  your note to call them). The optional link is the point: loose cold-call
+  reminders have to work without a prospect record.
 
 Creating a quote finds-or-creates the client by name and sets them to
 `quoting`; a `Won` outcome flips the business to `won`, `Lost`/`NTU` to `lost`.

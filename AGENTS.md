@@ -21,7 +21,11 @@ Built:
    search, filter, sort, call-back dates with due/overdue flags, a prominent
    manual add for cold calls, and JSON import from the old standalone board.
 
-Planned: Home with Today view, reminders, dashboard and export (Phase 4).
+6. **Home** (`/`) — Today view (reminders, call-backs, quotes past SLA),
+   reminders with an optional business link, and a copy-paste Top 5 for the
+   monthly sales meeting.
+
+All five phases are built. Do not start new scope without being asked.
 
 Build only what is requested. Do not build future scope.
 
