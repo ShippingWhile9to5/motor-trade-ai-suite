@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { generateSubmissionComposerOutputs } from "../../lib/submission-composer";
 import type {
@@ -263,12 +262,6 @@ export function SubmissionComposerPanel() {
   return (
     <section className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
-        <Link
-          href="/"
-          className="text-sm font-medium text-slate-600 hover:text-slate-950"
-        >
-          Back to home
-        </Link>
         <div>
           <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
             Submission Composer

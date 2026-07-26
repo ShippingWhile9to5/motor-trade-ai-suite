@@ -14,6 +14,16 @@ import { todayIso } from "../lib/reporting";
 import type { Business } from "../lib/schemas/business";
 import type { QuoteWithClient } from "../lib/schemas/quote";
 import type { Reminder } from "../lib/schemas/reminder";
+import {
+  BellIcon,
+  BoardIcon,
+  ClockIcon,
+  ComposerIcon,
+  LetterIcon,
+  PhoneIcon,
+  SearchIcon,
+  TrackerIcon,
+} from "./icons";
 
 type HomePanelProps = {
   reminders: Reminder[];
@@ -26,6 +36,7 @@ const TOOLS = [
   {
     href: "/prospect-finder",
     step: "01",
+    Icon: SearchIcon,
     title: "Prospect Finder",
     description:
       "Search Companies House by SIC code to find motor-trade firms in an area, and save the good ones.",
@@ -33,6 +44,7 @@ const TOOLS = [
   {
     href: "/prospect-board",
     step: "02",
+    Icon: BoardIcon,
     title: "Prospect Board",
     description:
       "Work your list. Set a call-back date and the card flags itself the day it falls due.",
@@ -40,6 +52,7 @@ const TOOLS = [
   {
     href: "/composer",
     step: "03",
+    Icon: ComposerIcon,
     title: "Submission Composer",
     description:
       "Turn the fact-find into the Motor Trade and Material Damage wording, plus the underwriter email.",
@@ -47,6 +60,7 @@ const TOOLS = [
   {
     href: "/quote-tracker",
     step: "04",
+    Icon: TrackerIcon,
     title: "Quote Tracker",
     description:
       "Follow every quote from submission to close, with amber and red flags when one needs chasing.",
@@ -54,6 +68,7 @@ const TOOLS = [
   {
     href: "/policy-letter",
     step: "05",
+    Icon: LetterIcon,
     title: "Policy Letter Generator",
     description:
       "Read the policy schedule and pull out the endorsements, conditions, exclusions and excesses for the client letter.",
@@ -66,10 +81,16 @@ const KIND_LABEL: Record<TodayItem["kind"], string> = {
   quote: "Quote",
 };
 
+const KIND_ICON: Record<TodayItem["kind"], typeof BellIcon> = {
+  reminder: BellIcon,
+  "follow-up": PhoneIcon,
+  quote: ClockIcon,
+};
+
 const KIND_STYLE: Record<TodayItem["kind"], string> = {
-  reminder: "bg-violet-100 text-violet-700",
-  "follow-up": "bg-blue-100 text-blue-700",
-  quote: "bg-amber-100 text-amber-800",
+  reminder: "bg-violet-50 text-violet-700 ring-violet-100",
+  "follow-up": "bg-brand-50 text-brand-700 ring-brand-100",
+  quote: "bg-amber-50 text-amber-800 ring-amber-100",
 };
 
 function ToolStep({
@@ -92,20 +113,23 @@ function ToolStep({
       )}
       <Link
         href={tool.href}
-        className="group block rounded-lg border border-slate-200 bg-white px-5 py-4 transition hover:border-slate-400 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950"
+        className="group block rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-card transition hover:border-brand-300 hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         <span className="flex items-baseline justify-between gap-3">
-          <span className="text-base font-semibold text-slate-950">
-            {tool.title}
+          <span className="flex items-center gap-2.5">
+            <tool.Icon className="h-[18px] w-[18px] shrink-0 text-brand-600" />
+            <span className="text-base font-semibold text-slate-950">
+              {tool.title}
+            </span>
           </span>
           <span
             aria-hidden="true"
-            className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600"
+            className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600"
           >
             →
           </span>
         </span>
-        <span className="mt-1 block text-sm leading-6 text-slate-600">
+        <span className="mt-1 block pl-[26px] text-sm leading-6 text-slate-600">
           {tool.description}
         </span>
       </Link>
@@ -196,7 +220,7 @@ function AddReminder({
         </label>
         <button
           type="button"
-          className="min-h-11 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+          className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
           onClick={handleSubmit}
           disabled={isPending || body.trim() === ""}
         >
@@ -238,8 +262,12 @@ function TodayRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${KIND_STYLE[item.kind]}`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${KIND_STYLE[item.kind]}`}
           >
+            {(() => {
+              const Icon = KIND_ICON[item.kind];
+              return <Icon className="h-3.5 w-3.5" />;
+            })()}
             {KIND_LABEL[item.kind]}
           </span>
           <span className="text-sm font-semibold text-slate-950">
@@ -348,7 +376,7 @@ function TopFive({
           </select>
           <button
             type="button"
-            className="min-h-9 rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            className="min-h-9 rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800"
             onClick={copy}
           >
             {copied ? "Copied" : "Copy"}
@@ -385,7 +413,7 @@ export function HomePanel({
   const overdue = items.filter((item) => item.overdue).length;
 
   return (
-    <section className="flex w-full max-w-3xl flex-1 flex-col gap-8">
+    <section className="flex w-full flex-1 flex-col gap-8">
       <header className="border-b border-slate-200 pb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
           Motor Trade AI Suite
@@ -409,7 +437,7 @@ export function HomePanel({
           </div>
           <button
             type="button"
-            className="min-h-11 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800"
             onClick={() => setShowAdd((open) => !open)}
           >
             {showAdd ? "Close" : "+ Add reminder"}
@@ -446,7 +474,9 @@ export function HomePanel({
         ) : null}
       </section>
 
-      <ol className="flex flex-col gap-3">
+      {/* The workflow list stays narrow — long single-line descriptions are
+          harder to read than a comfortable measure. */}
+      <ol className="flex max-w-3xl flex-col gap-3">
         {TOOLS.map((tool, index) => (
           <ToolStep
             key={tool.href}

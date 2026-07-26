@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   saveProspectAction,
@@ -132,12 +131,6 @@ export function ProspectFinderPanel() {
   return (
     <section className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
-        <Link
-          href="/"
-          className="text-sm font-medium text-slate-600 hover:text-slate-950"
-        >
-          Back to home
-        </Link>
         <div>
           <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
             Prospect Finder
@@ -205,7 +198,7 @@ export function ProspectFinderPanel() {
         <div className="mt-4">
           <button
             type="button"
-            className="min-h-11 rounded-md border border-slate-300 bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+            className="min-h-11 rounded-md border border-slate-300 bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
             onClick={handleSearch}
             disabled={isPending || sicCode.trim() === ""}
           >

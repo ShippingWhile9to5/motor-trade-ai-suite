@@ -8,6 +8,10 @@
 
 body {
   min-height: 100vh;
-  background: #f8fafc;
+  /* A touch warmer than slate-50, which reads cold and clinical against the
+     white cards sitting on it. */
+  background: #f7f8fa;
   color: #111827;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -259,7 +258,7 @@ function AddProspectForm({
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          className="min-h-11 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+          className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
           onClick={handleSubmit}
           disabled={isPending || form.name.trim() === ""}
         >
@@ -650,7 +649,7 @@ function ProspectCard({
             <button
               type="button"
               disabled={isPending}
-              className="min-h-11 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+              className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
               onClick={() =>
                 save({
                   name: draft.name,
@@ -1012,12 +1011,6 @@ export function ProspectBoardPanel({
   return (
     <section className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
-        <Link
-          href="/"
-          className="text-sm font-medium text-slate-600 hover:text-slate-950"
-        >
-          Back to home
-        </Link>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-slate-950 sm:text-4xl">
@@ -1030,7 +1023,7 @@ export function ProspectBoardPanel({
           </div>
           <button
             type="button"
-            className="min-h-11 shrink-0 rounded-md bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+            className="min-h-11 shrink-0 rounded-md bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
             onClick={() => {
               setShowAdd((open) => !open);
               setShowImport(false);
@@ -1061,7 +1054,7 @@ export function ProspectBoardPanel({
             type="button"
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium ${
               tab === value
-                ? "border-slate-950 text-slate-950"
+                ? "border-brand-700 text-brand-800"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
             onClick={() => setTab(value)}
@@ -1177,7 +1170,7 @@ export function ProspectBoardPanel({
           type="button"
           className={`min-h-11 rounded-md border px-3 py-2 text-sm font-medium ${
             onlyDue
-              ? "border-slate-950 bg-slate-950 text-white"
+              ? "border-brand-700 bg-brand-700 text-white"
               : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
           }`}
           onClick={() => setOnlyDue((value) => !value)}
