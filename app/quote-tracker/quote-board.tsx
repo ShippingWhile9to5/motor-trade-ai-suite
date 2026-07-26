@@ -213,6 +213,7 @@ function QuoteCard({
   const [commission, setCommission] = useState(
     quote.commission == null ? "" : String(quote.commission),
   );
+  const [armed, setArmed] = useState(false);
   const urgency = getUrgency(quote.stage, quote.stage_entered_at, quote.outcome);
   const days = getDaysInStage(quote.stage_entered_at);
   // Only worth showing once a negotiation has actually moved the price.
@@ -374,14 +375,36 @@ function QuoteCard({
           ))}
         </select>
 
-        <button
-          type="button"
-          disabled={isPending}
-          className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-          onClick={() => run(() => deleteQuoteAction({ id: quote.id }))}
-        >
-          Delete
-        </button>
+        {/* Armed first: a quote carries its premium history and commission,
+            and there is no undo. */}
+        {armed ? (
+          <>
+            <button
+              type="button"
+              disabled={isPending}
+              className="min-h-9 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+              onClick={() => run(() => deleteQuoteAction({ id: quote.id }))}
+            >
+              Yes, delete
+            </button>
+            <button
+              type="button"
+              className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+              onClick={() => setArmed(false)}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={isPending}
+            className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:border-red-300 hover:text-red-700 disabled:opacity-60"
+            onClick={() => setArmed(true)}
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );

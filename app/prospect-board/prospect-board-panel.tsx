@@ -352,11 +352,13 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
 
 function ProspectCard({
   business,
+  quoteCount,
   expanded,
   onToggle,
   onChanged,
 }: {
   business: Business;
+  quoteCount: number;
   expanded: boolean;
   onToggle: () => void;
   onChanged: () => void;
@@ -469,6 +471,12 @@ function ProspectCard({
               setQuickFollowUp(event.target.value);
               save({ follow_up: event.target.value });
             }}
+          />
+          <DeleteButton
+            size="small"
+            disabled={isPending}
+            quoteCount={quoteCount}
+            onConfirm={handleDelete}
           />
         </div>
       </div>
@@ -669,18 +677,74 @@ function ProspectCard({
             <span className="text-xs text-slate-400">
               Added from {business.source}
             </span>
-            <button
-              type="button"
-              disabled={isPending}
-              className="ml-auto min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-              onClick={handleDelete}
-            >
-              Delete
-            </button>
+            <span className="ml-auto">
+              <DeleteButton
+                disabled={isPending}
+                quoteCount={quoteCount}
+                onConfirm={handleDelete}
+              />
+            </span>
           </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+// Deleting a business cascades to its quotes, so this arms first and says what
+// else goes with it. There is no undo, and a won client carries its premium
+// and commission history.
+function DeleteButton({
+  onConfirm,
+  disabled,
+  quoteCount,
+  size = "normal",
+}: {
+  onConfirm: () => void;
+  disabled?: boolean;
+  quoteCount: number;
+  size?: "normal" | "small";
+}) {
+  const [armed, setArmed] = useState(false);
+  const padding = size === "small" ? "px-2 py-1" : "px-3 py-2";
+  const height = size === "small" ? "min-h-9" : "min-h-11";
+
+  if (!armed) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        className={`${height} shrink-0 rounded-md border border-slate-300 bg-white ${padding} text-xs text-slate-600 hover:border-red-300 hover:text-red-700 disabled:opacity-60`}
+        onClick={() => setArmed(true)}
+      >
+        Delete
+      </button>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span className="text-xs text-red-700">
+        {quoteCount > 0
+          ? `Delete this and its ${quoteCount} quote${quoteCount === 1 ? "" : "s"}?`
+          : "Delete for good?"}
+      </span>
+      <button
+        type="button"
+        disabled={disabled}
+        className={`${height} shrink-0 rounded-md bg-red-600 ${padding} text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60`}
+        onClick={onConfirm}
+      >
+        Yes, delete
+      </button>
+      <button
+        type="button"
+        className={`${height} shrink-0 rounded-md border border-slate-300 bg-white ${padding} text-xs text-slate-600 hover:bg-slate-50`}
+        onClick={() => setArmed(false)}
+      >
+        Cancel
+      </button>
+    </span>
   );
 }
 
@@ -762,14 +826,84 @@ function QuarterChart({ quotes }: { quotes: QuoteWithClient[] }) {
   );
 }
 
+function ClosedRow({
+  business,
+  quotes,
+  outcomeLabel,
+  onChanged,
+}: {
+  business: Business;
+  quotes: QuoteWithClient[];
+  outcomeLabel: "Won" | "Lost";
+  onChanged: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const quote = quotes.find(
+    (row) => row.business_id === business.id && row.outcome === outcomeLabel,
+  );
+  const quoteCount = quotes.filter(
+    (row) => row.business_id === business.id,
+  ).length;
+
+  function handleDelete() {
+    setError(null);
+    startTransition(async () => {
+      const outcome = await deleteBusinessAction({ id: business.id });
+
+      if (!outcome.ok) {
+        setError(outcome.error);
+        return;
+      }
+
+      onChanged();
+    });
+  }
+
+  return (
+    <tr className="border-b border-slate-100 last:border-0">
+      <td className="px-4 py-3 font-medium text-slate-950">
+        {business.name}
+        {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      </td>
+      <td className="px-4 py-3 text-slate-600">{quote?.insurer ?? "—"}</td>
+      <td className="px-4 py-3 text-slate-600">
+        {quote?.quoted_premium != null ? formatMoney(quote.quoted_premium) : "—"}
+      </td>
+      {outcomeLabel === "Won" ? (
+        <td className="px-4 py-3">
+          {quote?.commission != null ? (
+            <span className="text-slate-600">
+              {formatMoney(quote.commission)}
+            </span>
+          ) : (
+            <span className="text-amber-700">Not recorded</span>
+          )}
+        </td>
+      ) : null}
+      <td className="px-4 py-3 text-slate-500">{quote?.closed_at ?? "—"}</td>
+      <td className="px-4 py-3 text-right">
+        <DeleteButton
+          size="small"
+          disabled={isPending}
+          quoteCount={quoteCount}
+          onConfirm={handleDelete}
+        />
+      </td>
+    </tr>
+  );
+}
+
 function ClosedList({
   businesses,
   quotes,
   outcomeLabel,
+  onChanged,
 }: {
   businesses: Business[];
   quotes: QuoteWithClient[];
   outcomeLabel: "Won" | "Lost";
+  onChanged: () => void;
 }) {
   if (businesses.length === 0) {
     return (
@@ -793,45 +927,21 @@ function ClosedList({
             <th className="px-4 py-3 font-medium">
               {outcomeLabel === "Won" ? "Won" : "Closed"}
             </th>
+            <th className="px-4 py-3 text-right font-medium">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {businesses.map((business) => {
-            const quote = quotes.find(
-              (row) =>
-                row.business_id === business.id && row.outcome === outcomeLabel,
-            );
-
-            return (
-              <tr key={business.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3 font-medium text-slate-950">
-                  {business.name}
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {quote?.insurer ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {quote?.quoted_premium != null
-                    ? formatMoney(quote.quoted_premium)
-                    : "—"}
-                </td>
-                {outcomeLabel === "Won" ? (
-                  <td className="px-4 py-3">
-                    {quote?.commission != null ? (
-                      <span className="text-slate-600">
-                        {formatMoney(quote.commission)}
-                      </span>
-                    ) : (
-                      <span className="text-amber-700">Not recorded</span>
-                    )}
-                  </td>
-                ) : null}
-                <td className="px-4 py-3 text-slate-500">
-                  {quote?.closed_at ?? "—"}
-                </td>
-              </tr>
-            );
-          })}
+          {businesses.map((business) => (
+            <ClosedRow
+              key={business.id}
+              business={business}
+              quotes={quotes}
+              outcomeLabel={outcomeLabel}
+              onChanged={onChanged}
+            />
+          ))}
         </tbody>
       </table>
     </div>
@@ -878,6 +988,17 @@ export function ProspectBoardPanel({
     [businesses],
   );
   const wonTotals = useMemo(() => sumWon(quotes), [quotes]);
+  // Deleting a business cascades to its quotes, so the confirm can say how
+  // many go with it.
+  const quoteCountsByBusiness = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const quote of quotes) {
+      counts.set(quote.business_id, (counts.get(quote.business_id) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [quotes]);
   const stats = useMemo(() => getBoardStats(working, today), [working, today]);
   const visible = useMemo(
     () =>
@@ -976,6 +1097,7 @@ export function ProspectBoardPanel({
             businesses={closed[tab]}
             quotes={quotes}
             outcomeLabel={tab === "won" ? "Won" : "Lost"}
+            onChanged={refresh}
           />
         </>
       ) : null}
@@ -1093,6 +1215,7 @@ export function ProspectBoardPanel({
               // record rather than holding stale values.
               key={`${business.id}:${business.updated_at}`}
               business={business}
+              quoteCount={quoteCountsByBusiness.get(business.id) ?? 0}
               expanded={expandedId === business.id}
               onToggle={() =>
                 setExpandedId((current) =>
