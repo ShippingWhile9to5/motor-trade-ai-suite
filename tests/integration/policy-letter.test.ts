@@ -67,6 +67,24 @@ test("insurer selection applies that insurer's standard benefits", () => {
     premierProtectedNcd: false,
     lowClaimsRebate: false,
   });
+  // An insurer typed into "Other" has no standard benefits on record, so
+  // nothing is ticked for the broker rather than something being guessed.
+  assert.deepEqual(defaultBenefitsForInsurer("Some Other Insurer Ltd"), {
+    premierProtectedNcd: false,
+    lowClaimsRebate: false,
+  });
+});
+
+test("an unlisted insurer changes nothing but the benefit defaults", () => {
+  const { generateOpeningParagraph } = loadPolicyLetter();
+
+  // The insurer's only effect on the wording is which benefits get ticked —
+  // its name never appears in the paragraph. So a typed-in insurer reads
+  // exactly like a listed one with no standard benefits.
+  assert.equal(
+    generateOpeningParagraph(baseInput({ insurer: "Some Other Insurer Ltd" })),
+    generateOpeningParagraph(baseInput({ insurer: "Aviva" })),
+  );
 });
 
 test("benefits sentence lists what is ticked and is omitted when nothing is", () => {

@@ -9,9 +9,12 @@ export const INSURERS = [
   "Unicorn",
   "Aviva",
   "Allianz",
+  "Jensten",
 ] as const;
 
-export type Insurer = (typeof INSURERS)[number];
+// A listed insurer, or anything typed into the "Other" box — the list covers
+// the usual panel, not every insurer that can ever put up a quote.
+export type Insurer = (typeof INSURERS)[number] | (string & {});
 
 export const DRIVER_BASIS_OPTIONS = [
   "Any Employee for Business use, Named for SDP",

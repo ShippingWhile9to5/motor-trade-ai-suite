@@ -45,8 +45,9 @@ export const QUOTE_INSURERS = [
   "Allianz",
   "Niche",
   "Arch",
-  "Jenstons",
+  "Jensten",
   "Intact",
+  "Unicorn",
 ] as const;
 
 export const QUOTE_TYPES = ["New Business", "Renewal"] as const;

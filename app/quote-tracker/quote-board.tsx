@@ -32,6 +32,8 @@ type QuoteBoardProps = {
 
 // Sentinel for the "not on my board yet" option in the client picker.
 const NEW_CLIENT = "__new__";
+// The list covers the usual panel, not every insurer that can quote.
+const OTHER_INSURER = "__other__";
 
 const OUTCOMES: QuoteOutcome[] = ["Won", "Lost", "NTU"];
 
@@ -44,6 +46,7 @@ const emptyForm = {
   business_id: "",
   client_name: "",
   insurer: "",
+  other_insurer: "",
   quote_type: "New Business",
   submission_date: todayIso(),
   target_premium: "",
@@ -73,6 +76,8 @@ function AddQuoteForm({
   const [isPending, startTransition] = useTransition();
   const sorted = [...businesses].sort((a, b) => a.name.localeCompare(b.name));
   const addingNew = form.business_id === NEW_CLIENT;
+  const otherInsurer = form.insurer === OTHER_INSURER;
+  const insurerName = otherInsurer ? form.other_insurer.trim() : form.insurer;
 
   function update<Key extends keyof typeof form>(key: Key, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -85,7 +90,7 @@ function AddQuoteForm({
         await createQuoteAction({
           business_id: addingNew ? "" : form.business_id,
           client_name: addingNew ? form.client_name : "",
-          insurer: form.insurer,
+          insurer: insurerName,
           quote_type: form.quote_type,
           submission_date: form.submission_date,
           target_premium: form.target_premium,
@@ -107,7 +112,7 @@ function AddQuoteForm({
     ? form.client_name.trim() !== ""
     : form.business_id !== "";
   const canSubmit =
-    hasClient && form.insurer !== "" && form.submission_date !== "";
+    hasClient && insurerName !== "" && form.submission_date !== "";
 
   return (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
@@ -160,7 +165,18 @@ function AddQuoteForm({
                 {insurer}
               </option>
             ))}
+            <option value={OTHER_INSURER}>+ Other insurer</option>
           </select>
+          {otherInsurer ? (
+            <input
+              type="text"
+              autoFocus
+              value={form.other_insurer}
+              placeholder="Type the insurer"
+              className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) => update("other_insurer", event.target.value)}
+            />
+          ) : null}
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">

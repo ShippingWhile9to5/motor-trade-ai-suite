@@ -18,6 +18,9 @@ import type { ExtractedPolicyData } from "../../lib/schemas/policy-letter";
 type CopyState = "idle" | "copied" | "failed";
 type ExtractState = "idle" | "extracting" | "failed";
 
+// Sentinel for the free-text option in the insurer dropdown.
+const OTHER_INSURER = "__other__";
+
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -188,6 +191,10 @@ export function PolicyLetterPanel() {
     createBlankPolicyLetterManualInput,
   );
   const [outputs, setOutputs] = useState<PolicyLetterOutputs | null>(null);
+  // The insurer list covers the usual panel, not every insurer that can put up
+  // a quote — "Other" reveals a free-text box.
+  const [isOtherInsurer, setIsOtherInsurer] = useState(false);
+  const [otherInsurer, setOtherInsurer] = useState("");
 
   function updateManualField<Key extends keyof PolicyLetterManualInput>(
     key: Key,
@@ -197,8 +204,21 @@ export function PolicyLetterPanel() {
   }
 
   // Selecting an insurer applies that insurer's standard benefits; both
-  // checkboxes stay editable afterwards.
+  // checkboxes stay editable afterwards. An insurer typed into "Other" has no
+  // standard benefits to apply, so both start unticked.
   function handleInsurerChange(insurer: Insurer | "") {
+    if (insurer === OTHER_INSURER) {
+      setIsOtherInsurer(true);
+      setManualInput((current) => ({
+        ...current,
+        insurer: otherInsurer.trim(),
+        benefits: defaultBenefitsForInsurer(""),
+      }));
+      return;
+    }
+
+    setIsOtherInsurer(false);
+    setOtherInsurer("");
     setManualInput((current) => ({
       ...current,
       insurer,
@@ -372,7 +392,7 @@ export function PolicyLetterPanel() {
               Insurer
             </span>
             <select
-              value={manualInput.insurer}
+              value={isOtherInsurer ? OTHER_INSURER : manualInput.insurer}
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
               onChange={(event) =>
                 handleInsurerChange(event.target.value as Insurer | "")
@@ -384,7 +404,21 @@ export function PolicyLetterPanel() {
                   {insurer}
                 </option>
               ))}
+              <option value={OTHER_INSURER}>+ Other insurer</option>
             </select>
+            {isOtherInsurer ? (
+              <input
+                type="text"
+                autoFocus
+                value={otherInsurer}
+                placeholder="Type the insurer"
+                className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                onChange={(event) => {
+                  setOtherInsurer(event.target.value);
+                  updateManualField("insurer", event.target.value.trim());
+                }}
+              />
+            ) : null}
           </label>
           <label className="block">
             <span className="block text-sm font-medium text-slate-950">
