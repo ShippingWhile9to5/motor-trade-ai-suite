@@ -1019,7 +1019,9 @@ function ClosedList({
           </tr>
         </thead>
         <tbody>
-          {businesses.map((business) => (
+          {[...businesses]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((business) => (
             <ClosedRow
               key={business.id}
               business={business}
@@ -1044,7 +1046,9 @@ export function ProspectBoardPanel({
   const [tab, setTab] = useState<BoardTab>("pipeline");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<BusinessPipelineStatus | "">("");
-  const [sort, setSort] = useState<BoardSort>("rating");
+  // Alphabetical by default: you look a firm up by name far more often than
+  // you browse by rating. The dropdown still switches it.
+  const [sort, setSort] = useState<BoardSort>("name");
   const [onlyDue, setOnlyDue] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -1249,8 +1253,8 @@ export function ProspectBoardPanel({
           className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
           onChange={(event) => setSort(event.target.value as BoardSort)}
         >
-          <option value="rating">Sort: Rating</option>
           <option value="name">Sort: Name A–Z</option>
+          <option value="rating">Sort: Rating</option>
           <option value="followUp">Sort: Follow-up date</option>
         </select>
         <button

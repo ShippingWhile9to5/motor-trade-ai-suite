@@ -313,6 +313,34 @@ test("deleting a prospect cannot reach another user's record", async () => {
   assert.equal(store.business.length, 0);
 });
 
+test("alphabetical order ignores case and sorts real company names", () => {
+  const { sortBusinesses } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const named = (name: string) =>
+    ({ name, rating: null, follow_up: null }) as never;
+
+  assert.deepEqual(
+    sortBusinesses(
+      [
+        named("Vospers Motor House Limited"),
+        named("b s marson and sons limited"),
+        named("Chapel House Motor Co Ltd"),
+        named("À La Carte Motors"),
+      ],
+      "name",
+    ).map((row) => row.name),
+    [
+      "À La Carte Motors",
+      "b s marson and sons limited",
+      "Chapel House Motor Co Ltd",
+      "Vospers Motor House Limited",
+    ],
+    "localeCompare handles lower case and accents, which a raw < would not",
+  );
+});
+
 test("follow-up flags fire on due and overdue, but not once closed", () => {
   const { getFollowUpState } = require(
     "../../lib/prospect-board",
@@ -422,6 +450,11 @@ test("search matches name, town and director; sort puts undated last", () => {
   assert.deepEqual(
     sortBusinesses(rows, "rating").map((row) => row.id),
     ["b", "a"],
+  );
+  assert.deepEqual(
+    sortBusinesses(rows, "name").map((row) => row.id),
+    ["a", "b"],
+    "alphabetical is the board's default order",
   );
   assert.deepEqual(
     sortBusinesses(rows, "followUp").map((row) => row.id),

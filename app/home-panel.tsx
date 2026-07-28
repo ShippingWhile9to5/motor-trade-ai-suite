@@ -211,11 +211,13 @@ function AddReminder({
             onChange={(event) => setBusinessId(event.target.value)}
           >
             <option value="">Not linked</option>
-            {businesses.map((business) => (
-              <option key={business.id} value={business.id}>
-                {business.name}
-              </option>
-            ))}
+            {[...businesses]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((business) => (
+                <option key={business.id} value={business.id}>
+                  {business.name}
+                </option>
+              ))}
           </select>
         </label>
         <button
