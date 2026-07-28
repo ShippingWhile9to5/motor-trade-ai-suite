@@ -51,6 +51,17 @@ export async function updateBusinessWorkflow(
     return getBusinessById(userId, id);
   }
 
+  // Setting a call-back date means you have spoken to them, so the firm stops
+  // being one you still need to contact. Only ever promotes from "prospect",
+  // and never overrides a status set in the same edit.
+  if (changes.follow_up && changes.pipeline_status === undefined) {
+    const existing = await getBusinessById(userId, id);
+
+    if (existing?.pipeline_status === "prospect") {
+      changes.pipeline_status = "contacted";
+    }
+  }
+
   return updateBusiness(userId, id, changes);
 }
 

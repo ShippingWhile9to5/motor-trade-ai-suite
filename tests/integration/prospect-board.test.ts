@@ -266,6 +266,103 @@ test("a manually added prospect stores blanks as null", async () => {
   assert.equal(business.source, "manual");
 });
 
+test("setting a call-back date marks a cold prospect as contacted", async () => {
+  resetStore();
+  const { createBusinessWorkflow, updateBusinessWorkflow } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Liverpool MOT Centre",
+    pipeline_status: "prospect",
+  });
+
+  const updated = await updateBusinessWorkflow(USER, {
+    id: firm.id,
+    follow_up: "2026-08-04",
+  });
+
+  assert.equal(updated?.follow_up, "2026-08-04");
+  assert.equal(
+    updated?.pipeline_status,
+    "contacted",
+    "a call-back date means you have spoken to them",
+  );
+});
+
+test("the call-back promotion never overrides or demotes a status", async () => {
+  resetStore();
+  const { createBusinessWorkflow, updateBusinessWorkflow } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+
+  // Already further along: a renewal date must not drag it back to contacted.
+  const quoting = await createBusinessWorkflow(USER, {
+    name: "Croxdale Service Station",
+    pipeline_status: "quoting",
+  });
+  const stillQuoting = await updateBusinessWorkflow(USER, {
+    id: quoting.id,
+    follow_up: "2027-01-04",
+  });
+  assert.equal(stillQuoting?.pipeline_status, "quoting");
+
+  // A status set in the same edit wins over the rule.
+  const cold = await createBusinessWorkflow(USER, {
+    name: "Sutton Motor Services",
+    pipeline_status: "prospect",
+  });
+  const explicit = await updateBusinessWorkflow(USER, {
+    id: cold.id,
+    follow_up: "2026-08-04",
+    pipeline_status: "quoting",
+  });
+  assert.equal(explicit?.pipeline_status, "quoting");
+});
+
+test("clearing a call-back date leaves the status alone", async () => {
+  resetStore();
+  const { createBusinessWorkflow, updateBusinessWorkflow } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Liverpool MOT Centre",
+    pipeline_status: "prospect",
+  });
+
+  const cleared = await updateBusinessWorkflow(USER, {
+    id: firm.id,
+    follow_up: "",
+  });
+
+  assert.equal(cleared?.follow_up, null);
+  assert.equal(
+    cleared?.pipeline_status,
+    "prospect",
+    "removing a date is not evidence of a conversation",
+  );
+});
+
+test("editing something else does not promote a cold prospect", async () => {
+  resetStore();
+  const { createBusinessWorkflow, updateBusinessWorkflow } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Liverpool MOT Centre",
+    pipeline_status: "prospect",
+  });
+
+  const noted = await updateBusinessWorkflow(USER, {
+    id: firm.id,
+    notes: "Looked them up, not rung yet",
+  });
+
+  assert.equal(noted?.pipeline_status, "prospect");
+});
+
 test("a follow-up must be a real date", async () => {
   const { updateBusinessWorkflow } = require(
     "../../lib/services/businesses",
