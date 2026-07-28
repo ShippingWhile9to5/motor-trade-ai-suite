@@ -8,6 +8,7 @@ import {
   deleteBusinessWorkflow,
   importProspectsWorkflow,
   listBusinessesWorkflow,
+  recordCallAttemptWorkflow,
   updateBusinessWorkflow,
 } from "../../lib/services/businesses";
 import type { Business } from "../../lib/schemas/business";
@@ -76,6 +77,26 @@ export async function updateBusinessAction(
 }
 
 export type DeleteOutcome = { ok: true } | { ok: false; error: string };
+
+export async function recordCallAttemptAction(
+  input: unknown,
+): Promise<BusinessOutcome> {
+  const userId = await currentUserId();
+
+  try {
+    const business = await recordCallAttemptWorkflow(userId, input);
+
+    if (!business) {
+      return { ok: false, error: "That prospect no longer exists." };
+    }
+
+    revalidatePath("/prospect-board");
+
+    return { ok: true, business };
+  } catch (error) {
+    return failure(error, "Could not record the call.");
+  }
+}
 
 export async function deleteBusinessAction(
   input: unknown,

@@ -7,6 +7,7 @@ import {
   createBusinessAction,
   deleteBusinessAction,
   importProspectsAction,
+  recordCallAttemptAction,
   updateBusinessAction,
 } from "../actions/businesses";
 import {
@@ -14,6 +15,7 @@ import {
   type BoardSort,
   type BoardView,
   DEFAULT_SORT_FOR_VIEW,
+  describeAttempts,
   type FollowUpState,
   PIPELINE_STATUSES,
   PIPELINE_STATUS_LABELS,
@@ -473,6 +475,20 @@ function ProspectCard({
     });
   }
 
+  function handleNoAnswer() {
+    setError(null);
+    startTransition(async () => {
+      const outcome = await recordCallAttemptAction({ id: business.id });
+
+      if (!outcome.ok) {
+        setError(outcome.error);
+        return;
+      }
+
+      onChanged();
+    });
+  }
+
   function updateDraft<Key extends keyof Business>(
     key: Key,
     value: Business[Key],
@@ -480,9 +496,10 @@ function ProspectCard({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  const summary = [business.location, business.phone]
+  const summary = [business.location, business.phone ?? business.mobile]
     .filter(Boolean)
     .join(" · ");
+  const attempts = describeAttempts(business);
 
   return (
     <div className="rounded-md border border-slate-200 bg-white">
@@ -511,6 +528,22 @@ function ProspectCard({
           ) : null}
           {summary ? (
             <span className="truncate text-xs text-slate-500">{summary}</span>
+          ) : null}
+          {attempts ? (
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                business.attempts >= 4
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-slate-100 text-slate-500"
+              }`}
+              title={
+                business.attempts >= 4
+                  ? "Rung out repeatedly — worth checking the number or parking them"
+                  : "Call attempts with no answer"
+              }
+            >
+              {attempts}
+            </span>
           ) : null}
         </button>
 
@@ -543,6 +576,16 @@ function ProspectCard({
               save({ follow_up: event.target.value });
             }}
           />
+          {/* Rang out. Keeps them in the queue but moves them down it, so a
+              calling session never doubles back on the same firm. */}
+          <button
+            type="button"
+            disabled={isPending}
+            className="min-h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+            onClick={handleNoAnswer}
+          >
+            No answer
+          </button>
           {/* Attaches the quote to this exact firm, so the Quote Tracker
               doesn't have to match a typed name. */}
           <Link

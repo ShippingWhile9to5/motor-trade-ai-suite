@@ -55,6 +55,11 @@ export const businessSchema = z.object({
   pipeline_status: businessPipelineStatusSchema,
   follow_up: z.string().nullable().default(null),
   notes: z.string().nullable().default(null),
+  // Ringing out is not a pipeline status — the relationship has not moved —
+  // but it is a fact worth keeping, so a dead number cannot circle the queue
+  // forever unnoticed. Both are set by the service, never typed into a form.
+  attempts: z.number().int().default(0),
+  last_attempt_at: z.string().nullable().default(null),
   source: businessSourceSchema,
   created_at: z.string(),
   updated_at: z.string(),

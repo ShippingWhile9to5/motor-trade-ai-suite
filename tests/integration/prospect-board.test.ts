@@ -363,6 +363,128 @@ test("editing something else does not promote a cold prospect", async () => {
   assert.equal(noted?.pipeline_status, "prospect");
 });
 
+test("no answer counts the attempt without moving the status", async () => {
+  resetStore();
+  const { createBusinessWorkflow, recordCallAttemptWorkflow } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+  const { todayIso } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Liverpool MOT Centre",
+    pipeline_status: "prospect",
+  });
+
+  assert.equal(firm.attempts, 0);
+
+  const once = await recordCallAttemptWorkflow(USER, { id: firm.id });
+
+  assert.equal(once?.attempts, 1);
+  assert.equal(once?.last_attempt_at, todayIso());
+  assert.equal(
+    once?.pipeline_status,
+    "prospect",
+    "ringing out is not speaking to them — they stay in the queue",
+  );
+
+  const twice = await recordCallAttemptWorkflow(USER, { id: firm.id });
+
+  assert.equal(twice?.attempts, 2);
+});
+
+test("another user cannot log a call against your prospect", async () => {
+  resetStore();
+  const {
+    createBusinessWorkflow,
+    listBusinessesWorkflow,
+    recordCallAttemptWorkflow,
+  } = require(
+    "../../lib/services/businesses",
+  ) as typeof import("../../lib/services/businesses");
+
+  const mine = await createBusinessWorkflow("user_a", { name: "Mine Ltd" });
+
+  assert.equal(await recordCallAttemptWorkflow("user_b", { id: mine.id }), null);
+
+  const [unchanged] = await listBusinessesWorkflow("user_a");
+  assert.equal(unchanged.attempts, 0);
+  assert.equal(unchanged.last_attempt_at, null);
+});
+
+test("the queue reorders itself as you work down it", () => {
+  const { sortBusinesses } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const row = (
+    name: string,
+    rating: number,
+    attempts: number,
+    last: string | null,
+  ) =>
+    ({
+      name,
+      rating,
+      attempts,
+      last_attempt_at: last,
+      phone: "0151 000 0000",
+      mobile: null,
+      follow_up: null,
+    }) as never;
+
+  assert.deepEqual(
+    sortBusinesses(
+      [
+        row("Tried today", 5, 1, "2026-07-28"),
+        row("Never tried, three star", 3, 0, null),
+        row("Tried a fortnight ago", 4, 2, "2026-07-14"),
+        row("Never tried, five star", 5, 0, null),
+      ],
+      "callable",
+    ).map((r) => r.name),
+    [
+      "Never tried, five star",
+      "Never tried, three star",
+      "Tried a fortnight ago",
+      "Tried today",
+    ],
+    "fresh names first, then whoever you left longest",
+  );
+});
+
+test("attempts read as plain English on the row", () => {
+  const { describeAttempts } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const today = "2026-07-28";
+
+  assert.equal(
+    describeAttempts({ attempts: 0, last_attempt_at: null }, today),
+    "",
+    "an untried firm shows nothing at all",
+  );
+  assert.equal(
+    describeAttempts({ attempts: 1, last_attempt_at: "2026-07-28" }, today),
+    "tried 1× · today",
+  );
+  assert.equal(
+    describeAttempts({ attempts: 2, last_attempt_at: "2026-07-27" }, today),
+    "tried 2× · yesterday",
+  );
+  assert.equal(
+    describeAttempts({ attempts: 3, last_attempt_at: "2026-07-14" }, today),
+    "tried 3× · 14 days ago",
+  );
+  assert.equal(
+    describeAttempts({ attempts: 2, last_attempt_at: null }, today),
+    "tried 2×",
+    "a count with no date still says what it knows",
+  );
+});
+
 test("a follow-up must be a real date", async () => {
   const { updateBusinessWorkflow } = require(
     "../../lib/services/businesses",
@@ -606,6 +728,8 @@ test("search matches name, town and director; sort puts undated last", () => {
     rating: null,
     follow_up: null,
     notes: null,
+    attempts: 0,
+    last_attempt_at: null,
     source: "manual" as const,
     created_at: "",
     updated_at: "",

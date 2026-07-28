@@ -149,6 +149,42 @@ function haystack(business: Business): string {
     .toLowerCase();
 }
 
+// "tried 2× · 3 days ago" — short enough to sit on a row without crowding it.
+export function describeAttempts(
+  business: Pick<Business, "attempts" | "last_attempt_at">,
+  today: string = todayIso(),
+): string {
+  if (business.attempts === 0) {
+    return "";
+  }
+
+  const times = `tried ${business.attempts}×`;
+
+  if (!business.last_attempt_at) {
+    return times;
+  }
+
+  const days = Math.round(
+    (Date.parse(`${today}T00:00:00Z`) -
+      Date.parse(`${business.last_attempt_at}T00:00:00Z`)) /
+      86_400_000,
+  );
+
+  if (!Number.isFinite(days) || days < 0) {
+    return times;
+  }
+
+  if (days === 0) {
+    return `${times} · today`;
+  }
+
+  if (days === 1) {
+    return `${times} · yesterday`;
+  }
+
+  return `${times} · ${days} days ago`;
+}
+
 export function searchBusinesses(
   businesses: Business[],
   search: string,
@@ -189,13 +225,22 @@ export function sortBusinesses(
 
     if (sort === "callable") {
       // Working a cold-call list top-down, the best firm you can actually ring
-      // right now belongs first. A firm with no number is not callable yet, so
-      // it sinks below one you could pick the phone up to yet rate lower.
+      // right now belongs first:
+      //   1. one you can ring at all — no number means not yet callable
+      //   2. one you have never tried, ahead of one that rang out
+      //   3. of those you have tried, the longest ago
+      //   4. then the best rated, then alphabetical
+      // The effect is a queue that reorders itself as you work down it, so you
+      // never hit the same firm twice in a session.
       const aCallable = a.phone || a.mobile ? 1 : 0;
       const bCallable = b.phone || b.mobile ? 1 : 0;
+      const aUntried = a.attempts === 0 ? 1 : 0;
+      const bUntried = b.attempts === 0 ? 1 : 0;
 
       return (
         bCallable - aCallable ||
+        bUntried - aUntried ||
+        (a.last_attempt_at ?? "").localeCompare(b.last_attempt_at ?? "") ||
         (b.rating ?? 0) - (a.rating ?? 0) ||
         a.name.localeCompare(b.name)
       );

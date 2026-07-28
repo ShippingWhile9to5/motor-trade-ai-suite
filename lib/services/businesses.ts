@@ -17,6 +17,7 @@ import {
   listBusinesses,
   updateBusiness,
 } from "../repositories/businesses";
+import { todayIso } from "../reporting";
 
 export async function listBusinessesWorkflow(
   userId: string,
@@ -63,6 +64,27 @@ export async function updateBusinessWorkflow(
   }
 
   return updateBusiness(userId, id, changes);
+}
+
+// Rang out. The status is deliberately untouched — you have not spoken to
+// anyone, so the firm is still one to contact. What changes is that you tried,
+// which is what keeps it from coming round again the same afternoon.
+export async function recordCallAttemptWorkflow(
+  userId: string,
+  input: unknown,
+): Promise<Business | null> {
+  const { id } = updateBusinessInputSchema.pick({ id: true }).parse(input);
+
+  const existing = await getBusinessById(userId, id);
+
+  if (!existing) {
+    return null;
+  }
+
+  return updateBusiness(userId, id, {
+    attempts: existing.attempts + 1,
+    last_attempt_at: todayIso(),
+  });
 }
 
 export async function deleteBusinessWorkflow(
