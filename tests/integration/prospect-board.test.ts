@@ -341,6 +341,115 @@ test("alphabetical order ignores case and sorts real company names", () => {
   );
 });
 
+test("each view answers one question", () => {
+  const { filterByView } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const today = "2026-07-28";
+  const row = (over: Record<string, unknown>) =>
+    ({
+      name: "Firm",
+      pipeline_status: "prospect",
+      follow_up: null,
+      phone: null,
+      mobile: null,
+      rating: null,
+      ...over,
+    }) as never;
+
+  const live = [
+    row({ name: "Cold", pipeline_status: "prospect" }),
+    row({ name: "Rung", pipeline_status: "contacted" }),
+    row({ name: "Quoting", pipeline_status: "quoting" }),
+    row({
+      name: "Overdue call-back",
+      pipeline_status: "contacted",
+      follow_up: "2026-07-01",
+    }),
+    row({
+      name: "Future call-back",
+      pipeline_status: "contacted",
+      follow_up: "2026-12-01",
+    }),
+  ];
+
+  assert.deepEqual(
+    filterByView(live, "due", today).map((r) => r.name),
+    ["Overdue call-back"],
+    "a date in December is not today's problem",
+  );
+  assert.deepEqual(
+    filterByView(live, "to-contact", today).map((r) => r.name),
+    ["Cold"],
+  );
+  assert.deepEqual(
+    filterByView(live, "working", today).map((r) => r.name),
+    ["Rung", "Quoting", "Overdue call-back", "Future call-back"],
+  );
+  assert.equal(filterByView(live, "all", today).length, 5);
+});
+
+test("the cold-call queue puts the best firm you can ring at the top", () => {
+  const { sortBusinesses } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const row = (name: string, rating: number | null, phone: string | null) =>
+    ({ name, rating, phone, mobile: null, follow_up: null }) as never;
+
+  assert.deepEqual(
+    sortBusinesses(
+      [
+        row("Five, no number", 5, null),
+        row("Three, callable", 3, "0151 000 0000"),
+        row("Five, callable", 5, "0161 000 0000"),
+        row("Four, callable", 4, "01565 000000"),
+      ],
+      "callable",
+    ).map((r) => r.name),
+    [
+      "Five, callable",
+      "Four, callable",
+      "Three, callable",
+      "Five, no number",
+    ],
+    "a five-star you cannot ring is no use mid-call-session",
+  );
+});
+
+test("a mobile counts as callable even with no landline", () => {
+  const { sortBusinesses } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const row = (name: string, phone: string | null, mobile: string | null) =>
+    ({ name, rating: 3, phone, mobile, follow_up: null }) as never;
+
+  assert.deepEqual(
+    sortBusinesses(
+      [row("No number", null, null), row("Mobile only", null, "07700 900000")],
+      "callable",
+    ).map((r) => r.name),
+    ["Mobile only", "No number"],
+  );
+});
+
+test("search looks across everything, not just one view", () => {
+  const { searchBusinesses } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const rows = [
+    { name: "Knutsford MOT Centre", location: "Knutsford", directors: [] },
+    { name: "Autoquest", location: "Knutsford", directors: [] },
+    { name: "Poynton Motors", location: "Poynton", directors: [] },
+  ] as never[];
+
+  assert.equal(searchBusinesses(rows, "knutsford").length, 2);
+  assert.equal(searchBusinesses(rows, "  ").length, 3, "a blank search filters nothing");
+});
+
 test("follow-up flags fire on due and overdue, but not once closed", () => {
   const { getFollowUpState } = require(
     "../../lib/prospect-board",

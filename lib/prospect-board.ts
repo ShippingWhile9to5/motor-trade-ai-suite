@@ -85,7 +85,53 @@ export type BoardFilters = {
   onlyDue: boolean;
 };
 
-export type BoardSort = "rating" | "name" | "followUp";
+export type BoardSort = "rating" | "name" | "followUp" | "callable";
+
+// Named views, so the board answers a question rather than showing everything
+// and leaving you to find the answer in it.
+export type BoardView = "due" | "to-contact" | "working" | "all";
+
+export const BOARD_VIEWS: { value: BoardView; label: string }[] = [
+  { value: "due", label: "Due today" },
+  { value: "to-contact", label: "To contact" },
+  { value: "working", label: "Working" },
+  { value: "all", label: "All" },
+];
+
+// Each view opens in the order that suits its job: you look things up in All
+// by name, but you work down To contact best-first.
+export const DEFAULT_SORT_FOR_VIEW: Record<BoardView, BoardSort> = {
+  due: "followUp",
+  "to-contact": "callable",
+  working: "followUp",
+  all: "name",
+};
+
+export function filterByView(
+  businesses: Business[],
+  view: BoardView,
+  today: string = todayIso(),
+): Business[] {
+  if (view === "all") {
+    return businesses;
+  }
+
+  if (view === "due") {
+    return businesses.filter((business) => isDue(business, today));
+  }
+
+  if (view === "to-contact") {
+    return businesses.filter(
+      (business) => business.pipeline_status === "prospect",
+    );
+  }
+
+  return businesses.filter(
+    (business) =>
+      business.pipeline_status === "contacted" ||
+      business.pipeline_status === "quoting",
+  );
+}
 
 function haystack(business: Business): string {
   return [
@@ -103,23 +149,30 @@ function haystack(business: Business): string {
     .toLowerCase();
 }
 
+export function searchBusinesses(
+  businesses: Business[],
+  search: string,
+): Business[] {
+  const query = search.trim().toLowerCase();
+
+  if (query === "") {
+    return businesses;
+  }
+
+  return businesses.filter((business) => haystack(business).includes(query));
+}
+
 export function filterBusinesses(
   businesses: Business[],
   filters: BoardFilters,
   today: string = todayIso(),
 ): Business[] {
-  const query = filters.search.trim().toLowerCase();
-
-  return businesses.filter((business) => {
+  return searchBusinesses(businesses, filters.search).filter((business) => {
     if (filters.onlyDue && !isDue(business, today)) {
       return false;
     }
 
-    if (filters.status && business.pipeline_status !== filters.status) {
-      return false;
-    }
-
-    return query === "" || haystack(business).includes(query);
+    return !filters.status || business.pipeline_status === filters.status;
   });
 }
 
@@ -132,6 +185,20 @@ export function sortBusinesses(
   sorted.sort((a, b) => {
     if (sort === "name") {
       return a.name.localeCompare(b.name);
+    }
+
+    if (sort === "callable") {
+      // Working a cold-call list top-down, the best firm you can actually ring
+      // right now belongs first. A firm with no number is not callable yet, so
+      // it sinks below one you could pick the phone up to yet rate lower.
+      const aCallable = a.phone || a.mobile ? 1 : 0;
+      const bCallable = b.phone || b.mobile ? 1 : 0;
+
+      return (
+        bCallable - aCallable ||
+        (b.rating ?? 0) - (a.rating ?? 0) ||
+        a.name.localeCompare(b.name)
+      );
     }
 
     if (sort === "followUp") {

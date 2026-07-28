@@ -10,13 +10,16 @@ import {
   updateBusinessAction,
 } from "../actions/businesses";
 import {
+  BOARD_VIEWS,
   type BoardSort,
+  type BoardView,
+  DEFAULT_SORT_FOR_VIEW,
   type FollowUpState,
   PIPELINE_STATUSES,
   PIPELINE_STATUS_LABELS,
-  filterBusinesses,
-  getBoardStats,
+  filterByView,
   getFollowUpState,
+  searchBusinesses,
   sortBusinesses,
   todayIso,
 } from "../../lib/prospect-board";
@@ -1045,11 +1048,12 @@ export function ProspectBoardPanel({
   const [, startTransition] = useTransition();
   const [tab, setTab] = useState<BoardTab>("pipeline");
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<BusinessPipelineStatus | "">("");
-  // Alphabetical by default: you look a firm up by name far more often than
-  // you browse by rating. The dropdown still switches it.
-  const [sort, setSort] = useState<BoardSort>("name");
-  const [onlyDue, setOnlyDue] = useState(false);
+  const [view, setView] = useState<BoardView>("to-contact");
+  // Each view opens in the sort that suits its job; changing view resets it,
+  // and this dropdown overrides.
+  const [sort, setSort] = useState<BoardSort>(
+    DEFAULT_SORT_FOR_VIEW["to-contact"],
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -1058,10 +1062,15 @@ export function ProspectBoardPanel({
     startTransition(() => router.refresh());
   }
 
+  function changeView(next: BoardView) {
+    setView(next);
+    setSort(DEFAULT_SORT_FOR_VIEW[next]);
+  }
+
   const today = todayIso();
-  // The working list is what is still live — won and lost have their own tabs
-  // rather than sitting at the bottom of everything you are chasing.
-  const working = useMemo(
+  // Everything still in play — won and lost have their own tabs rather than
+  // sitting at the bottom of what you are chasing.
+  const live = useMemo(
     () =>
       businesses.filter(
         (business) =>
@@ -1077,6 +1086,35 @@ export function ProspectBoardPanel({
     }),
     [businesses],
   );
+  const viewCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        BOARD_VIEWS.map(({ value }) => [
+          value,
+          filterByView(live, value, today).length,
+        ]),
+      ) as Record<BoardView, number>,
+    [live, today],
+  );
+  const searching = search.trim() !== "";
+  // A search looks across everything still live, whatever view you are in —
+  // otherwise a firm you know exists comes back "no matches" because it sits
+  // in a pile you are not looking at.
+  const visible = useMemo(() => {
+    const pool = searching
+      ? searchBusinesses(live, search)
+      : filterByView(live, view, today);
+
+    return sortBusinesses(pool, sort);
+  }, [live, search, searching, view, sort, today]);
+  const noPhone = useMemo(
+    () =>
+      view === "to-contact" && !searching
+        ? visible.filter((business) => !business.phone && !business.mobile)
+            .length
+        : 0,
+    [visible, view, searching],
+  );
   const wonTotals = useMemo(() => sumWon(quotes), [quotes]);
   // Deleting a business cascades to its quotes, so the confirm can say how
   // many go with it.
@@ -1089,16 +1127,6 @@ export function ProspectBoardPanel({
 
     return counts;
   }, [quotes]);
-  const stats = useMemo(() => getBoardStats(working, today), [working, today]);
-  const visible = useMemo(
-    () =>
-      sortBusinesses(
-        filterBusinesses(working, { search, status, onlyDue }, today),
-        sort,
-      ),
-    [working, search, status, onlyDue, sort, today],
-  );
-
   return (
     <section className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
@@ -1135,7 +1163,7 @@ export function ProspectBoardPanel({
       <div className="flex gap-1 border-b border-slate-200">
         {(
           [
-            ["pipeline", `Pipeline (${working.length})`],
+            ["pipeline", `Pipeline (${live.length})`],
             ["won", `Won (${closed.won.length})`],
             ["lost", `Lost (${closed.lost.length})`],
           ] as const
@@ -1188,26 +1216,36 @@ export function ProspectBoardPanel({
 
       {tab === "pipeline" ? (
         <>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-        <span>
-          <b className="text-slate-950">{stats.total}</b> live
-        </span>
-        <span>
-          <b className="text-slate-950">{stats.toContact}</b> to contact
-        </span>
-        {stats.due > 0 ? (
-          <span className="text-amber-700">
-            <b>{stats.due}</b> due now
-          </span>
-        ) : null}
-        {stats.overdue > 0 ? (
-          <span className="text-red-700">
-            <b>{stats.overdue}</b> overdue
-          </span>
-        ) : null}
-        <span>
-          <b className="text-slate-950">{stats.quoting}</b> quoting
-        </span>
+      {/* Named views rather than raw filters: a list of everything answers no
+          question you actually have. */}
+      <div className="flex flex-wrap gap-2">
+        {BOARD_VIEWS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={!searching && view === value}
+            className={`min-h-9 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              !searching && view === value
+                ? "border-brand-700 bg-brand-700 text-white"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+            onClick={() => {
+              setSearch("");
+              changeView(value);
+            }}
+          >
+            {label}
+            <span
+              className={`ml-1.5 tabular-nums ${
+                !searching && view === value
+                  ? "text-white/70"
+                  : "text-slate-400"
+              }`}
+            >
+              {viewCounts[value]}
+            </span>
+          </button>
+        ))}
       </div>
 
       {showAdd ? (
@@ -1229,45 +1267,16 @@ export function ProspectBoardPanel({
           onChange={(event) => setSearch(event.target.value)}
         />
         <select
-          value={status}
-          aria-label="Filter by status"
-          className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-          onChange={(event) =>
-            setStatus(event.target.value as BusinessPipelineStatus | "")
-          }
-        >
-          <option value="">All statuses</option>
-          {/* Won and lost have their own tabs, so offering them here would
-              only ever return nothing. */}
-          {PIPELINE_STATUSES.filter(
-            (option) => option !== "won" && option !== "lost",
-          ).map((option) => (
-            <option key={option} value={option}>
-              {PIPELINE_STATUS_LABELS[option]}
-            </option>
-          ))}
-        </select>
-        <select
           value={sort}
           aria-label="Sort prospects"
           className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
           onChange={(event) => setSort(event.target.value as BoardSort)}
         >
+          <option value="callable">Sort: Best to ring</option>
           <option value="name">Sort: Name A–Z</option>
           <option value="rating">Sort: Rating</option>
           <option value="followUp">Sort: Follow-up date</option>
         </select>
-        <button
-          type="button"
-          className={`min-h-11 rounded-md border px-3 py-2 text-sm font-medium ${
-            onlyDue
-              ? "border-brand-700 bg-brand-700 text-white"
-              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-          onClick={() => setOnlyDue((value) => !value)}
-        >
-          Due today
-        </button>
         <button
           type="button"
           className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -1282,8 +1291,30 @@ export function ProspectBoardPanel({
 
       {showImport ? <ImportPanel onDone={refresh} /> : null}
 
+      <p className="text-sm text-slate-500">
+        {searching ? (
+          <>
+            {visible.length} match{visible.length === 1 ? "" : "es"} across all{" "}
+            {live.length} live prospects.
+          </>
+        ) : (
+          <>
+            Showing {visible.length}
+            {noPhone > 0 ? (
+              <>
+                {" "}
+                — the last {noPhone === 1 ? "one has" : `${noPhone} have`} no
+                number yet, so {noPhone === 1 ? "it sits" : "they sit"} at the
+                bottom
+              </>
+            ) : null}
+            .
+          </>
+        )}
+      </p>
+
       <div className="flex flex-col gap-3">
-        {working.length === 0 ? (
+        {live.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
             No prospects yet. Use <b>Add prospect</b> after a cold call, save
             firms from the Prospect Finder, or paste in a researched batch with{" "}
