@@ -277,10 +277,36 @@ function AddProspectForm({
   );
 }
 
+// The keys the importer reads, as a prompt-ready spec. Anything else in the
+// JSON is ignored rather than rejected, so a near-miss shape still imports.
+const FORMAT_SPEC = `Return the prospects as a JSON array in exactly this shape. Only "name" is required; omit any field you cannot find rather than guessing.
+
+[
+  {
+    "name": "Liverpool MOT Centre Ltd",
+    "companyNumber": "09876543",
+    "location": "Liverpool",
+    "address": "Unit 4 Dock Road, Liverpool, L3 4AA",
+    "phone": "0151 000 0000",
+    "email": "info@example.co.uk",
+    "website": "example.co.uk",
+    "franchise": "Independent",
+    "services": "MOT, servicing, used sales",
+    "profile": "What the firm does and how big it is.",
+    "opportunity": "What you could quote them for.",
+    "approachAngle": "A reason to ring them.",
+    "rating": 4,
+    "directors": [
+      { "name": "Jane Smith", "role": "Director", "appointed": "2015" }
+    ]
+  }
+]`;
+
 function ImportPanel({ onDone }: { onDone: () => void }) {
   const [text, setText] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedFormat, setCopiedFormat] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleImport() {
@@ -319,16 +345,58 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Import a backup
+        Import prospects
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        Paste the JSON export from the old Prospect Board. Duplicates are matched
-        on company number, then name, so importing twice is safe.
+        Paste a JSON list of firms — a batch you have had researched, or a
+        backup from the old board. Only <code>name</code> is required;
+        everything else is optional. Duplicates are matched on company number,
+        then name, so importing twice is safe.
       </p>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm font-medium text-brand-700 hover:text-brand-800">
+          Show the format to ask for
+        </summary>
+        {/* Paste this straight into a research prompt so the JSON comes back
+            in a shape the importer reads without editing. */}
+        <pre className="mt-2 overflow-x-auto rounded-md bg-slate-50 px-3 py-3 font-mono text-xs leading-5 text-slate-700">
+{`[
+  {
+    "name": "Liverpool MOT Centre Ltd",
+    "companyNumber": "09876543",
+    "location": "Liverpool",
+    "address": "Unit 4 Dock Road, Liverpool, L3 4AA",
+    "phone": "0151 000 0000",
+    "email": "info@example.co.uk",
+    "website": "example.co.uk",
+    "franchise": "Independent",
+    "services": "MOT, servicing, used sales",
+    "profile": "What the firm does and how big it is.",
+    "opportunity": "What you could quote them for.",
+    "approachAngle": "A reason to ring them.",
+    "rating": 4,
+    "directors": [
+      { "name": "Jane Smith", "role": "Director", "appointed": "2015" }
+    ]
+  }
+]`}
+        </pre>
+        <button
+          type="button"
+          className="mt-2 min-h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          onClick={() => {
+            void navigator.clipboard.writeText(FORMAT_SPEC);
+            setCopiedFormat(true);
+            window.setTimeout(() => setCopiedFormat(false), 2000);
+          }}
+        >
+          {copiedFormat ? "Copied" : "Copy the format"}
+        </button>
+      </details>
       <textarea
         rows={5}
         value={text}
-        placeholder='[ { "name": "…", "companyNumber": "…" } ]'
+        placeholder='[ { "name": "…", "phone": "…" } ]'
         className="mt-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-950"
         onChange={(event) => setText(event.target.value)}
       />
@@ -1204,7 +1272,7 @@ export function ProspectBoardPanel({
             setShowAdd(false);
           }}
         >
-          {showImport ? "Close import" : "Import backup"}
+          {showImport ? "Close import" : "Import prospects"}
         </button>
       </div>
 
@@ -1214,7 +1282,8 @@ export function ProspectBoardPanel({
         {working.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
             No prospects yet. Use <b>Add prospect</b> after a cold call, save
-            firms from the Prospect Finder, or import a backup.
+            firms from the Prospect Finder, or paste in a researched batch with{" "}
+            <b>Import prospects</b>.
           </p>
         ) : visible.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">

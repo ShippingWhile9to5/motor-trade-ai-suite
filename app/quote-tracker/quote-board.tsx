@@ -8,6 +8,7 @@ import {
   updateQuoteAction,
 } from "../actions/quotes";
 import {
+  CLOSED_STAGE,
   QUOTE_INSURERS,
   QUOTE_STAGES,
   QUOTE_TYPES,
@@ -265,6 +266,7 @@ function QuoteCard({
     quote.commission == null ? "" : String(quote.commission),
   );
   const [armed, setArmed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const urgency = getUrgency(quote.stage, quote.stage_entered_at, quote.outcome);
   const days = getDaysInStage(quote.stage_entered_at);
   // Only worth showing once a negotiation has actually moved the price.
@@ -302,96 +304,54 @@ function QuoteCard({
     run(() => updateQuoteAction({ id: quote.id, commission }));
   }
 
+  // Collapsed, a card is a name, where it stands and how long it has stood
+  // there — enough to scan a column. The rest is one click away.
+  const price = quote.quoted_premium ?? quote.target_premium;
+
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950">
-            {quote.client_name}
-          </p>
-          <p className="text-xs text-slate-500">
-            {quote.insurer} · {quote.quote_type}
-          </p>
-        </div>
-        {quote.outcome ? (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${outcomeBadge[quote.outcome]}`}
-          >
-            {quote.outcome}
+    <div className="rounded-md border border-slate-200 bg-white shadow-card">
+      <div className="px-3 py-2.5">
+        <button
+          type="button"
+          className="flex w-full items-start gap-2 text-left"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-950">
+              {quote.client_name}
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-slate-500">
+              {quote.insurer}
+              {price != null ? ` · £${price.toFixed(0)}` : ""}
+              {quote.outcome ? "" : ` · ${days}d`}
+            </span>
           </span>
-        ) : (
-          <span
-            className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${urgencyDot[urgency]}`}
-            title={
-              urgency === "none"
-                ? "On track"
-                : `${STAGE_ACTIONS[quote.stage]} — ${days} day${days === 1 ? "" : "s"} in stage`
-            }
-          />
-        )}
-      </div>
+          {quote.outcome ? (
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${outcomeBadge[quote.outcome]}`}
+            >
+              {quote.outcome}
+            </span>
+          ) : (
+            <span
+              className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${urgencyDot[urgency]}`}
+              title={
+                urgency === "none"
+                  ? "On track"
+                  : `${STAGE_ACTIONS[quote.stage]} — ${days} day${days === 1 ? "" : "s"} in stage`
+              }
+            />
+          )}
+        </button>
 
-      {quote.target_premium != null ? (
-        <p className="mt-2 text-xs text-slate-600">
-          Target £{quote.target_premium.toFixed(2)}
-        </p>
-      ) : null}
-
-      <div className="mt-2">
-        <label className="block">
-          <span className="block text-xs text-slate-600">Quoted £</span>
-          <input
-            type="number"
-            value={quoted}
-            placeholder="0.00"
-            disabled={isPending}
-            className="mt-1 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
-            onChange={(event) => setQuoted(event.target.value)}
-            onBlur={commitQuoted}
-          />
-        </label>
-        {reducedFrom != null ? (
-          <p
-            className="mt-1 text-xs text-emerald-700"
-            title="What the insurer first quoted"
-          >
-            was £{reducedFrom.toFixed(2)}
-          </p>
-        ) : null}
-      </div>
-
-      {/* Commission is typed in by hand, so it is asked for at the moment the
-          deal is won rather than left to be remembered later. */}
-      {quote.outcome === "Won" ? (
-        <label className="mt-2 block">
-          <span className="block text-xs text-slate-600">Commission £</span>
-          <input
-            type="number"
-            value={commission}
-            placeholder="0.00"
-            disabled={isPending}
-            className={`mt-1 min-h-9 w-full rounded-md border bg-white px-2 py-1 text-xs text-slate-950 ${
-              quote.commission == null
-                ? "border-amber-400"
-                : "border-slate-300"
-            }`}
-            onChange={(event) => setCommission(event.target.value)}
-            onBlur={commitCommission}
-          />
-        </label>
-      ) : null}
-
-      <p className="mt-2 text-xs text-slate-500">
-        {quote.outcome
-          ? "Closed"
-          : `${days} day${days === 1 ? "" : "s"} in stage`}
-      </p>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* Moving a stage is the most common thing you do here, so it stays
+            out of the fold. */}
         <select
           value={quote.stage}
           disabled={isPending}
-          className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
+          aria-label={`Stage for ${quote.client_name}`}
+          className="mt-2 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
           onChange={(event) =>
             run(() =>
               updateQuoteAction({ id: quote.id, stage: Number(event.target.value) }),
@@ -404,59 +364,115 @@ function QuoteCard({
             </option>
           ))}
         </select>
-
-        <select
-          value={quote.outcome ?? ""}
-          disabled={isPending}
-          className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
-          onChange={(event) =>
-            run(() =>
-              updateQuoteAction({
-                id: quote.id,
-                outcome: event.target.value === "" ? null : event.target.value,
-              }),
-            )
-          }
-        >
-          <option value="">Outcome…</option>
-          {OUTCOMES.map((outcome) => (
-            <option key={outcome} value={outcome}>
-              {outcome}
-            </option>
-          ))}
-        </select>
-
-        {/* Armed first: a quote carries its premium history and commission,
-            and there is no undo. */}
-        {armed ? (
-          <>
-            <button
-              type="button"
-              disabled={isPending}
-              className="min-h-9 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
-              onClick={() => run(() => deleteQuoteAction({ id: quote.id }))}
-            >
-              Yes, delete
-            </button>
-            <button
-              type="button"
-              className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
-              onClick={() => setArmed(false)}
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            disabled={isPending}
-            className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:border-red-300 hover:text-red-700 disabled:opacity-60"
-            onClick={() => setArmed(true)}
-          >
-            Delete
-          </button>
-        )}
       </div>
+
+      {expanded ? (
+        <div className="border-t border-slate-200 px-3 py-3">
+          <p className="text-xs text-slate-500">
+            {quote.quote_type}
+            {quote.target_premium != null
+              ? ` · target £${quote.target_premium.toFixed(2)}`
+              : ""}
+          </p>
+
+          <label className="mt-2 block">
+            <span className="block text-xs text-slate-600">Quoted £</span>
+            <input
+              type="number"
+              value={quoted}
+              placeholder="0.00"
+              disabled={isPending}
+              className="mt-1 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
+              onChange={(event) => setQuoted(event.target.value)}
+              onBlur={commitQuoted}
+            />
+          </label>
+          {reducedFrom != null ? (
+            <p
+              className="mt-1 text-xs text-emerald-700"
+              title="What the insurer first quoted"
+            >
+              was £{reducedFrom.toFixed(2)}
+            </p>
+          ) : null}
+
+          {/* Commission is typed in by hand, so it is asked for at the moment
+              the deal is won rather than left to be remembered later. */}
+          {quote.outcome === "Won" ? (
+            <label className="mt-2 block">
+              <span className="block text-xs text-slate-600">Commission £</span>
+              <input
+                type="number"
+                value={commission}
+                placeholder="0.00"
+                disabled={isPending}
+                className={`mt-1 min-h-9 w-full rounded-md border bg-white px-2 py-1 text-xs text-slate-950 ${
+                  quote.commission == null
+                    ? "border-amber-400"
+                    : "border-slate-300"
+                }`}
+                onChange={(event) => setCommission(event.target.value)}
+                onBlur={commitCommission}
+              />
+            </label>
+          ) : null}
+
+          <select
+            value={quote.outcome ?? ""}
+            disabled={isPending}
+            aria-label={`Outcome for ${quote.client_name}`}
+            className="mt-2 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
+            onChange={(event) =>
+              run(() =>
+                updateQuoteAction({
+                  id: quote.id,
+                  outcome: event.target.value === "" ? null : event.target.value,
+                }),
+              )
+            }
+          >
+            <option value="">Outcome…</option>
+            {OUTCOMES.map((outcome) => (
+              <option key={outcome} value={outcome}>
+                {outcome}
+              </option>
+            ))}
+          </select>
+
+          {/* Armed first: a quote carries its premium history and commission,
+              and there is no undo. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {armed ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  className="min-h-9 rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                  onClick={() => run(() => deleteQuoteAction({ id: quote.id }))}
+                >
+                  Yes, delete
+                </button>
+                <button
+                  type="button"
+                  className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                  onClick={() => setArmed(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={isPending}
+                className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:border-red-300 hover:text-red-700 disabled:opacity-60"
+                onClick={() => setArmed(true)}
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -469,6 +485,7 @@ export function QuoteBoard({
 }: QuoteBoardProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [showClosed, setShowClosed] = useState(false);
 
   function refresh() {
     startTransition(() => router.refresh());
@@ -478,6 +495,12 @@ export function QuoteBoard({
     (quote) =>
       getUrgency(quote.stage, quote.stage_entered_at, quote.outcome) !== "none",
   );
+  const closedCount = quotes.filter(
+    (quote) => quote.stage === CLOSED_STAGE,
+  ).length;
+  const visibleStages = showClosed
+    ? QUOTE_STAGES
+    : QUOTE_STAGES.filter((stage) => stage !== CLOSED_STAGE);
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -513,8 +536,27 @@ export function QuoteBoard({
         onCreated={refresh}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {QUOTE_STAGES.map((stage) => {
+      {/* Closed quotes need no attention, so the column is out of the way by
+          default and the live stages get the width back. */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          {quotes.length} quote{quotes.length === 1 ? "" : "s"} on the board
+        </p>
+        <button
+          type="button"
+          className="min-h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          onClick={() => setShowClosed((open) => !open)}
+        >
+          {showClosed ? "Hide closed" : `Show closed (${closedCount})`}
+        </button>
+      </div>
+
+      <div
+        className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 ${
+          showClosed ? "xl:grid-cols-6" : "xl:grid-cols-5"
+        }`}
+      >
+        {visibleStages.map((stage) => {
           const stageQuotes = quotes.filter((quote) => quote.stage === stage);
 
           return (
