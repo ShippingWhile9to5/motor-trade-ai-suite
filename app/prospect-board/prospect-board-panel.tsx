@@ -151,6 +151,12 @@ function CommissionReport({
                     {column}
                   </th>
                 ))}
+                {/* Not one of the sheet's columns — it must never reach the
+                    export, which is why it is added here and not to
+                    COMMISSION_COLUMNS. */}
+                <th className="px-4 py-3 font-medium">
+                  <span className="sr-only">Save row</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -182,6 +188,7 @@ function CommissionReport({
                 <td className="px-4 py-3 text-right text-emerald-700">
                   {formatMoney(totals.share)}
                 </td>
+                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           </table>
@@ -189,6 +196,18 @@ function CommissionReport({
       )}
     </>
   );
+}
+
+// What can be corrected on a return, held as a draft: a row is usually put
+// right in one go, and each save costs a round trip before the totals redraw.
+type CommissionDraft = { commission: string; fee: string; policyType: string };
+
+function commissionDraftOf(row: CommissionRow): CommissionDraft {
+  return {
+    commission: row.commissionIncome == null ? "" : String(row.commissionIncome),
+    fee: row.feeIncome == null ? "" : String(row.feeIncome),
+    policyType: row.policyType,
+  };
 }
 
 function CommissionRowView({
@@ -199,14 +218,43 @@ function CommissionRowView({
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [fee, setFee] = useState(
-    row.feeIncome == null ? "" : String(row.feeIncome),
-  );
-  const [commission, setCommission] = useState(
-    row.commissionIncome == null ? "" : String(row.commissionIncome),
-  );
+  const [draft, setDraft] = useState(() => commissionDraftOf(row));
+  const stored = commissionDraftOf(row);
+  const signature = `${stored.commission}|${stored.fee}|${stored.policyType}`;
+  const [savedSignature, setSavedSignature] = useState(signature);
 
-  function save(changes: Record<string, unknown>) {
+  // The row has been written since these boxes were filled in, so they go back
+  // to what was actually stored.
+  if (savedSignature !== signature) {
+    setSavedSignature(signature);
+    setDraft(stored);
+  }
+
+  const changes: Record<string, string | null> = {};
+
+  if (draft.commission.trim() !== stored.commission) {
+    changes.commission = draft.commission;
+  }
+
+  if (draft.fee.trim() !== stored.fee) {
+    changes.fee = draft.fee;
+  }
+
+  if (draft.policyType !== stored.policyType) {
+    changes.policy_type = draft.policyType || null;
+  }
+
+  const dirty = Object.keys(changes).length > 0;
+
+  function update(key: keyof CommissionDraft, value: string) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function save() {
+    if (!dirty) {
+      return;
+    }
+
     startTransition(async () => {
       await updateQuoteAction({ id: row.quoteId, ...changes });
       onChanged();
@@ -225,13 +273,13 @@ function CommissionRowView({
           the column the return is wrong in, on the screen it is read from. */}
       <td className="px-4 py-3 text-slate-600">
         <PolicyTypeField
-          value={row.policyType}
+          value={draft.policyType}
           disabled={isPending}
           label={`Policy type for ${row.policyholder}`}
           className={`min-h-9 w-44 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
-            row.policyType === "" ? "border-amber-400" : "border-slate-300"
+            draft.policyType === "" ? "border-amber-400" : "border-slate-300"
           }`}
-          onSave={(policy_type) => save({ policy_type: policy_type || null })}
+          onSave={(next) => update("policyType", next)}
         />
       </td>
       <td className="px-4 py-3 text-slate-600">{row.insurer}</td>
@@ -241,38 +289,23 @@ function CommissionRowView({
       <td className="px-4 py-3 text-right">
         <input
           type="number"
-          value={commission}
+          value={draft.commission}
           placeholder="0.00"
           disabled={isPending}
           aria-label={`Commission income for ${row.policyholder}`}
-          className={`${cell} ${row.commissionIncome == null ? "border-amber-400" : "border-slate-300"}`}
-          onChange={(event) => setCommission(event.target.value)}
-          onBlur={() => {
-            const current =
-              row.commissionIncome == null ? "" : String(row.commissionIncome);
-
-            if (commission.trim() !== current) {
-              save({ commission });
-            }
-          }}
+          className={`${cell} ${draft.commission === "" ? "border-amber-400" : "border-slate-300"}`}
+          onChange={(event) => update("commission", event.target.value)}
         />
       </td>
       <td className="px-4 py-3 text-right">
         <input
           type="number"
-          value={fee}
+          value={draft.fee}
           placeholder="0.00"
           disabled={isPending}
           aria-label={`Fee income for ${row.policyholder}`}
           className={`${cell} border-slate-300`}
-          onChange={(event) => setFee(event.target.value)}
-          onBlur={() => {
-            const current = row.feeIncome == null ? "" : String(row.feeIncome);
-
-            if (fee.trim() !== current) {
-              save({ fee });
-            }
-          }}
+          onChange={(event) => update("fee", event.target.value)}
         />
       </td>
       <td className="px-4 py-3 text-right text-slate-600">
@@ -280,6 +313,18 @@ function CommissionRowView({
       </td>
       <td className="px-4 py-3 text-right font-medium text-emerald-700">
         {formatMoney(row.share)}
+      </td>
+      {/* One save for the whole row: the totals and the quarter's figures are
+          recomputed on the server, so three edits should cost one wait. */}
+      <td className="px-4 py-3 text-right">
+        <button
+          type="button"
+          disabled={!dirty || isPending}
+          className="min-h-9 rounded-md bg-brand-700 px-3 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:bg-slate-100 disabled:text-slate-400"
+          onClick={save}
+        >
+          {isPending ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
       </td>
     </tr>
   );
