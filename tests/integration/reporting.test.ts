@@ -77,33 +77,71 @@ test("quarterly totals bucket wins by the date they closed", () => {
       wonQuote({ closed_at: "2026-07-20", commission: 400, quoted_premium: 2000 }),
       wonQuote({ closed_at: "2026-04-05", commission: 250, quoted_premium: 1500 }),
     ] as never,
-    3,
+    8,
     "2026-07-25",
   );
 
-  assert.equal(series.length, 3);
   assert.deepEqual(
     series.map((period) => period.label),
-    ["Q1 26", "Q2 26", "Q3 26"],
-    "oldest first, with empty quarters kept so the chart has no gaps",
+    ["Q2 26", "Q3 26"],
+    "starts at the first win, not a fixed run of quarters before the book existed",
   );
-  assert.equal(series[0].commission, 0);
-  assert.equal(series[1].commission, 250);
-  assert.equal(series[2].commission, 1000);
-  assert.equal(series[2].won, 2);
-  assert.equal(series[2].premium, 6000);
+  assert.equal(series[0].commission, 250);
+  assert.equal(series[1].commission, 1000);
+  assert.equal(series[1].won, 2);
+  assert.equal(series[1].premium, 6000);
 });
 
-test("the quarter series walks back across a year boundary", () => {
+test("with nothing won yet, the chart is just this quarter", () => {
   const { quarterlyTotals } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
-  const series = quarterlyTotals([], 6, "2026-02-14");
+  assert.deepEqual(
+    quarterlyTotals([], 8, "2026-07-25").map((period) => period.label),
+    ["Q3 26"],
+    "a new book should not show quarters that predate it",
+  );
+});
+
+test("empty quarters between wins are kept, and the run walks across a year", () => {
+  const { quarterlyTotals } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const series = quarterlyTotals(
+    [
+      wonQuote({ closed_at: "2025-11-10", commission: 500 }),
+      wonQuote({ closed_at: "2026-02-14", commission: 700 }),
+    ] as never,
+    8,
+    "2026-02-20",
+  );
 
   assert.deepEqual(
     series.map((period) => period.label),
-    ["Q4 24", "Q1 25", "Q2 25", "Q3 25", "Q4 25", "Q1 26"],
+    ["Q4 25", "Q1 26"],
+  );
+  assert.equal(series[0].commission, 500);
+  assert.equal(series[1].commission, 700);
+});
+
+test("a long book is capped at the most recent quarters", () => {
+  const { quarterlyTotals } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const series = quarterlyTotals(
+    [wonQuote({ closed_at: "2020-01-05", commission: 100 })] as never,
+    4,
+    "2026-07-25",
+  );
+
+  assert.equal(series.length, 4, "capped rather than drawing 26 bars");
+  assert.equal(
+    series[series.length - 1].label,
+    "Q3 26",
+    "and it is the recent end that is kept",
   );
 });
 

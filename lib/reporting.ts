@@ -74,9 +74,14 @@ export function sumWon(quotes: QuoteWithClient[]): WonTotals {
 
 // Won quotes grouped into the quarter they closed in, oldest first. Quarters
 // with nothing in them are filled in so the chart has no gaps.
+// Counted from Q1 of year 0, so two quarters can be compared and subtracted.
+function quarterIndex({ year, quarter }: Quarter): number {
+  return year * 4 + (quarter - 1);
+}
+
 export function quarterlyTotals(
   quotes: QuoteWithClient[],
-  count = 6,
+  maxQuarters = 8,
   today: string = todayIso(),
 ): QuarterTotals[] {
   const current = quarterOf(today);
@@ -84,6 +89,25 @@ export function quarterlyTotals(
   if (!current) {
     return [];
   }
+
+  // Start at the first win, not a fixed number of quarters back — otherwise a
+  // new book shows a run of empty quarters from before it existed.
+  const firstWin = quotes
+    .filter((quote) => isWon(quote) && quote.closed_at)
+    .map((quote) => quarterOf(quote.closed_at as string))
+    .filter((period): period is Quarter => period !== null)
+    .reduce<Quarter | null>(
+      (earliest, period) =>
+        !earliest || quarterIndex(period) < quarterIndex(earliest)
+          ? period
+          : earliest,
+      null,
+    );
+
+  const span = firstWin
+    ? quarterIndex(current) - quarterIndex(firstWin) + 1
+    : 1;
+  const count = Math.min(Math.max(span, 1), maxQuarters);
 
   const buckets = new Map<string, QuarterTotals>();
   const series: QuarterTotals[] = [];

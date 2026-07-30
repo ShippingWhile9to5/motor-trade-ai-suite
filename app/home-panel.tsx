@@ -8,6 +8,13 @@ import {
   deleteReminderAction,
   updateReminderAction,
 } from "./actions/reminders";
+import { updateBusinessAction } from "./actions/businesses";
+import { updateQuoteAction } from "./actions/quotes";
+import {
+  PIPELINE_STATUSES,
+  PIPELINE_STATUS_LABELS,
+} from "../lib/prospect-board";
+import { QUOTE_STAGES, STAGE_LABELS } from "../lib/quote-tracker";
 import { buildTodayList, type TodayItem } from "../lib/today";
 import { formatTopProspects, pickTopProspects } from "../lib/top-five";
 import { todayIso } from "../lib/reporting";
@@ -239,14 +246,26 @@ function AddReminder({
 
 function TodayRow({
   item,
+  reminders,
+  businesses,
+  quotes,
   onChanged,
 }: {
   item: TodayItem;
+  reminders: Reminder[];
+  businesses: Business[];
+  quotes: QuoteWithClient[];
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const reminderId =
-    item.kind === "reminder" ? item.id.replace("reminder:", "") : null;
+  const [expanded, setExpanded] = useState(false);
+  const reminderId = item.kind === "reminder" ? item.sourceId : null;
+  const reminder = reminders.find((row) => row.id === item.sourceId) ?? null;
+  const business = businesses.find((row) => row.id === item.businessId) ?? null;
+  const quote = quotes.find((row) => row.id === item.sourceId) ?? null;
+  const [body, setBody] = useState(reminder?.body ?? "");
+  const [dueDate, setDueDate] = useState(reminder?.due_date ?? "");
+  const [followUp, setFollowUp] = useState(business?.follow_up ?? "");
 
   function run(action: () => Promise<unknown>) {
     startTransition(async () => {
@@ -257,11 +276,17 @@ function TodayRow({
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+      className={`rounded-md border ${
         item.overdue ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"
       }`}
     >
-      <div className="min-w-0">
+    <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <button
+        type="button"
+        className="min-w-0 flex-1 text-left"
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${KIND_STYLE[item.kind]}`}
@@ -285,7 +310,7 @@ function TodayRow({
           {item.detail}
           {item.dueDate ? ` · due ${item.dueDate}` : ""}
         </p>
-      </div>
+      </button>
 
       <div className="flex shrink-0 items-center gap-2">
         {reminderId ? (
@@ -322,6 +347,136 @@ function TodayRow({
           </Link>
         )}
       </div>
+    </div>
+
+      {/* Deal with it here rather than being sent off to another tool for a
+          date change. */}
+      {expanded ? (
+        <div className="border-t border-slate-200 px-4 py-3">
+          {reminderId && reminder ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="flex-1">
+                <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Reminder
+                </span>
+                <input
+                  type="text"
+                  value={body}
+                  className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                  onChange={(event) => setBody(event.target.value)}
+                />
+              </label>
+              <label>
+                <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Due
+                </span>
+                <input
+                  type="date"
+                  value={dueDate}
+                  className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={isPending || body.trim() === ""}
+                className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
+                onClick={() =>
+                  run(() =>
+                    updateReminderAction({
+                      id: reminderId,
+                      body,
+                      due_date: dueDate,
+                    }),
+                  )
+                }
+              >
+                Save
+              </button>
+            </div>
+          ) : null}
+
+          {item.kind === "follow-up" && business ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label>
+                <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Next call back
+                </span>
+                <input
+                  type="date"
+                  value={followUp}
+                  className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                  onChange={(event) => {
+                    setFollowUp(event.target.value);
+                    run(() =>
+                      updateBusinessAction({
+                        id: business.id,
+                        follow_up: event.target.value,
+                      }),
+                    );
+                  }}
+                />
+              </label>
+              <label>
+                <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Status
+                </span>
+                <select
+                  value={business.pipeline_status}
+                  disabled={isPending}
+                  className="mt-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                  onChange={(event) =>
+                    run(() =>
+                      updateBusinessAction({
+                        id: business.id,
+                        pipeline_status: event.target.value,
+                      }),
+                    )
+                  }
+                >
+                  {PIPELINE_STATUSES.map((option) => (
+                    <option key={option} value={option}>
+                      {PIPELINE_STATUS_LABELS[option]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {business.notes ? (
+                <p className="flex-1 whitespace-pre-line text-xs text-slate-600">
+                  {business.notes}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {item.kind === "quote" && quote ? (
+            <label className="block sm:max-w-xs">
+              <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                Stage
+              </span>
+              <select
+                value={quote.stage}
+                disabled={isPending}
+                className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                onChange={(event) =>
+                  run(() =>
+                    updateQuoteAction({
+                      id: quote.id,
+                      stage: Number(event.target.value),
+                    }),
+                  )
+                }
+              >
+                {QUOTE_STAGES.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {STAGE_LABELS[stage]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -457,7 +612,14 @@ export function HomePanel({
         ) : null}
 
         {items.map((item) => (
-          <TodayRow key={item.id} item={item} onChanged={refresh} />
+          <TodayRow
+            key={item.id}
+            item={item}
+            reminders={reminders}
+            businesses={businesses}
+            quotes={quotes}
+            onChanged={refresh}
+          />
         ))}
       </section>
 

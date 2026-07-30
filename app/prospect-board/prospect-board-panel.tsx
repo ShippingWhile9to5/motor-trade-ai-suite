@@ -10,6 +10,7 @@ import {
   recordCallAttemptAction,
   updateBusinessAction,
 } from "../actions/businesses";
+import { updateQuoteAction } from "../actions/quotes";
 import {
   BOARD_VIEWS,
   type BoardSort,
@@ -967,6 +968,26 @@ function ClosedRow({
   const quoteCount = quotes.filter(
     (row) => row.business_id === business.id,
   ).length;
+  // Editable here as well as on the Quote Tracker: this is the tab you are
+  // looking at when you reconcile the figures, so it is where you fix them.
+  const [premium, setPremium] = useState(
+    quote?.quoted_premium == null ? "" : String(quote.quoted_premium),
+  );
+  const [commission, setCommission] = useState(
+    quote?.commission == null ? "" : String(quote.commission),
+  );
+
+  function saveQuote(changes: Record<string, unknown>) {
+    if (!quote) {
+      return;
+    }
+
+    setError(null);
+    startTransition(async () => {
+      await updateQuoteAction({ id: quote.id, ...changes });
+      onChanged();
+    });
+  }
 
   function handleDelete() {
     setError(null);
@@ -990,16 +1011,54 @@ function ClosedRow({
       </td>
       <td className="px-4 py-3 text-slate-600">{quote?.insurer ?? "—"}</td>
       <td className="px-4 py-3 text-slate-600">
-        {quote?.quoted_premium != null ? formatMoney(quote.quoted_premium) : "—"}
+        {quote ? (
+          <input
+            type="number"
+            value={premium}
+            placeholder="0.00"
+            disabled={isPending}
+            aria-label={`Gross premium for ${business.name}`}
+            className="min-h-9 w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-950"
+            onChange={(event) => setPremium(event.target.value)}
+            onBlur={() => {
+              const current =
+                quote.quoted_premium == null ? "" : String(quote.quoted_premium);
+
+              if (premium.trim() !== current) {
+                saveQuote({ quoted_premium: premium });
+              }
+            }}
+          />
+        ) : (
+          "—"
+        )}
       </td>
       {outcomeLabel === "Won" ? (
         <td className="px-4 py-3">
-          {quote?.commission != null ? (
-            <span className="text-slate-600">
-              {formatMoney(quote.commission)}
-            </span>
+          {quote ? (
+            <input
+              type="number"
+              value={commission}
+              placeholder="0.00"
+              disabled={isPending}
+              aria-label={`Commission for ${business.name}`}
+              className={`min-h-9 w-28 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
+                quote.commission == null
+                  ? "border-amber-400"
+                  : "border-slate-300"
+              }`}
+              onChange={(event) => setCommission(event.target.value)}
+              onBlur={() => {
+                const current =
+                  quote.commission == null ? "" : String(quote.commission);
+
+                if (commission.trim() !== current) {
+                  saveQuote({ commission });
+                }
+              }}
+            />
           ) : (
-            <span className="text-amber-700">Not recorded</span>
+            "—"
           )}
         </td>
       ) : null}

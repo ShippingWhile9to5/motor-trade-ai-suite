@@ -11,6 +11,9 @@ export type TodayKind = "reminder" | "follow-up" | "quote";
 
 export type TodayItem = {
   id: string;
+  // The record this row came from, so the row can be edited where it is shown
+  // rather than sending you off to the tool it belongs to.
+  sourceId: string;
   kind: TodayKind;
   title: string;
   detail: string;
@@ -49,6 +52,7 @@ export function buildTodayList(
 
     items.push({
       id: `reminder:${reminder.id}`,
+      sourceId: reminder.id,
       kind: "reminder",
       title: reminder.body,
       detail: attached ?? "Note to self",
@@ -71,6 +75,7 @@ export function buildTodayList(
 
     items.push({
       id: `follow-up:${business.id}`,
+      sourceId: business.id,
       kind: "follow-up",
       title: business.name,
       detail: business.phone ? `Call back · ${business.phone}` : "Call back due",
@@ -91,6 +96,7 @@ export function buildTodayList(
 
     items.push({
       id: `quote:${quote.id}`,
+      sourceId: quote.id,
       kind: "quote",
       title: quote.client_name,
       detail: `${STAGE_ACTIONS[quote.stage]} · ${quote.insurer} · ${days} day${days === 1 ? "" : "s"}`,
