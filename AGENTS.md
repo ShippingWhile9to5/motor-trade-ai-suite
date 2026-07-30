@@ -17,15 +17,20 @@ Built:
 3. **Quote Tracker** (`/quote-tracker`) — kanban pipeline with SLA urgency.
 4. **Prospect Finder** (`/prospect-finder`) — Companies House SIC search →
    save as prospects.
-5. **Prospect Board** (`/prospect-board`) — the working list of every business:
-   search, filter, sort, call-back dates with due/overdue flags, a prominent
-   manual add for cold calls, and JSON import from the old standalone board.
+5. **Prospect Board** (`/prospect-board`) — four tabs. Pipeline (named views:
+   Due today / To contact / Working / All), Won, Lost, and the quarterly
+   Commission return with an Excel-shaped export.
 
-6. **Home** (`/`) — Today view (reminders, call-backs, quotes past SLA),
-   reminders with an optional business link, and a copy-paste Top 5 for the
-   monthly sales meeting.
+6. **Home** (`/`) — Today view (reminders, call-backs, quotes past SLA, each
+   editable in place), reminders with an optional business link, and a
+   copy-paste Top 5 for the monthly sales meeting.
 
 All five phases are built. Do not start new scope without being asked.
+
+Prefer putting a rule in the **service** rather than in a form, so it holds
+wherever the edit comes from — the follow-up promotion and the automatic
+quote close are both there, and both have tests pinning down the cases where
+they must *not* fire.
 
 Build only what is requested. Do not build future scope.
 

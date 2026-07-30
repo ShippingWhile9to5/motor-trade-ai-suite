@@ -31,13 +31,20 @@ Nick's real-world workflow, and where each tool fits:
    urgency flags. Persisted.
 5. **`/prospect-finder` — Prospect Finder.** Companies House SIC search →
    save firms as prospects. Persisted.
-6. **`/prospect-board` — Prospect Board.** Three tabs. **Pipeline** is the
-   working list of everything still live: search, status filter, sort, and a
-   "Due today" view driven by the `follow_up` date. A prominent **Add
-   prospect** button is the cold-call entry point (name only is enough). Also
-   imports a JSON backup from the old standalone board. **Won** shows deals
-   won, premium, commission and a commission-by-quarter chart (calendar
-   quarters). **Lost** lists the rest. Persisted.
+6. **`/prospect-board` — Prospect Board.** Four tabs.
+   **Pipeline** is everything still live, split by *named view* rather than
+   raw filters — **Due today / To contact / Working / All**, each with a count.
+   It opens on To contact, which is where a calling session starts, and each
+   view carries the sort that suits its job (`DEFAULT_SORT_FOR_VIEW`). A
+   search ignores the active view and looks across everything live, so a firm
+   is never hidden in a pile you are not looking at. **Add prospect** is the
+   cold-call entry point (name only is enough); **Import prospects** takes a
+   JSON batch and shows a copyable spec of the keys it reads. Each row has
+   **No answer** (counts the attempt, leaves the status alone) and **Quote**
+   (opens the tracker with the firm already attached).
+   **Won** and **Lost** list the closed firms, premium and commission
+   editable in place. **Commission** is the quarterly return — see below.
+   Persisted.
 
 7. **`/` — Home.** The **Today** view: reminders, call-backs due from the
    board, and quotes past their SLA, overdue first. **Add reminder** takes a
@@ -62,9 +69,15 @@ Nick's real-world workflow, and where each tool fits:
   `user_id`
 - `lib/services` — business flow / orchestration
 - `lib/providers` — external integrations (Claude extraction, Companies House)
-- `lib/*.ts` — pure logic (`submission-composer.ts`, `policy-letter.ts`,
-  `quote-tracker.ts`, `prospect-finder.ts`, `prospect-board.ts`)
-- `app/` — UI (server components/actions) only; no business or DB logic here
+- `lib/*.ts` — pure logic, no I/O: `submission-composer.ts`, `policy-letter.ts`,
+  `quote-tracker.ts` (stages + SLA), `prospect-finder.ts`, `prospect-board.ts`
+  (views, sorts, import mapping), `today.ts` (the Today list), `top-five.ts`
+  (the meeting list), `reporting.ts` (calendar quarters, money formatting),
+  `commission.ts` (the quarterly return)
+- `app/` — UI (server components/actions) only; no business or DB logic here.
+  `app/nav.tsx` is the shared top bar, `app/icons.tsx` the inline SVGs. The
+  single accent colour is `brand` in `tailwind.config.js` — change it there
+  and it changes everywhere.
 
 ## Data model
 
@@ -74,10 +87,18 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
 
 - **`business`** — name, Companies House details, contact info, rating,
   `pipeline_status`, `follow_up` (the Prospect Board's call-back date),
+  `attempts` + `last_attempt_at` (rang out, nobody answered),
   `source` (`manual` | `finder` | `import`). Unique index on
   `(user_id, company_number)` is the dedup guard, so only a real Companies
   House number belongs in that column — `splitCompanyNumber()` keeps free text
   out of it on import.
+  Two rules live in `updateBusinessWorkflow`, not in a form, so they hold
+  wherever the edit comes from: **setting a `follow_up` promotes a `prospect`
+  to `contacted`** (a call-back date is evidence you spoke to them), and it
+  never overrides a status set in the same edit nor demotes one further along.
+  **Ringing out is not a status change** — `recordCallAttemptWorkflow` counts
+  the attempt and leaves the firm in the queue, which is what makes the
+  "best to ring" sort reorder itself as you work down it.
 - **`quote`** — belongs to a business: insurer, type, submission date, 6-stage
   pipeline, premiums, outcome, `stage_entered_at` (the SLA clock). Stages 4–5
   (`Sent to Client` / `Back to Insurer`) are the client-facing loop: the quote
@@ -87,7 +108,11 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
   in, which `stage_entered_at` cannot be trusted for because moving the stage
   afterwards would reset it. `initial_quoted_premium` is captured automatically
   the first time a quoted price is entered, so a negotiated reduction does not
-  erase what the insurer first put up. `commission` is typed in by hand (Nick's
+  erase what the insurer first put up. `policy_type` is the **product** (Motor
+  Trade Combined, Fleet, Contractors Combined, Property Owners, or typed in) —
+  not to be confused with `quote_type`, which is New Business vs Renewal; the
+  commission return needs both and they are different columns. `fee` is fee
+  income. `commission` is typed in by hand (Nick's
   choice — it varies by insurer and scheme), so the Won tab counts how many
   won deals are missing one rather than quietly understating the total.
 
@@ -96,8 +121,21 @@ through `prospect → contacted → quoting → won/lost`. A client is entered o
   your note to call them). The optional link is the point: loose cold-call
   reminders have to work without a prospect record.
 
-Creating a quote finds-or-creates the client by name and sets them to
+A quote attaches to a firm **by id** when picked from the dropdown or reached
+via the board's Quote button; typing a name falls back to find-or-create, which
+can only ever be as good as the spelling. Either way the client is set to
 `quoting`; a `Won` outcome flips the business to `won`, `Lost`/`NTU` to `lost`.
+
+## The commission return
+
+`lib/commission.ts` mirrors, column for column, the spreadsheet Nick sends his
+manager each quarter: policyholder, policy type, insurers, gross premium,
+commission income, fee income, total income, and his `BROKER_SHARE` (20%).
+Total income is commission + fee; the share is a flat fifth of that. **Copy for
+Excel** emits tab-separated text — commas do not paste into cells reliably —
+with no currency symbols, and a blank figure exports blank rather than as a
+misleading zero. Won deals missing a commission are counted and flagged, so a
+short return says so instead of looking complete.
 
 ## What is and isn't stored
 
