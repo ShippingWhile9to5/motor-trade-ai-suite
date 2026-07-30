@@ -21,6 +21,10 @@ export const quoteSchema = z.object({
   // Commission is typed in by hand — it varies by insurer and scheme, so it
   // is not derived from the premium.
   commission: z.number().nullable().default(null),
+  // The product, for the commission report. Free text so an unusual cover can
+  // be typed rather than blocking the export on a list being complete.
+  policy_type: z.string().nullable().default(null),
+  fee: z.number().nullable().default(null),
   // Stamped when the outcome is set. stage_entered_at is not a safe substitute
   // because moving the stage afterwards would reset it and shift the quarter
   // a deal was won in.
@@ -70,6 +74,7 @@ export const createQuoteInputSchema = z
     client_name: z.string().trim().default(""),
     insurer: z.string().trim().min(1, "Insurer is required."),
     quote_type: z.string().trim().default("New Business"),
+    policy_type: z.string().trim().nullable().default("Motor Trade Combined"),
     submission_date: z.string().trim().min(1, "Submission date is required."),
     stage: z.number().int().min(1).max(6).default(1),
     notes: z.string().trim().nullable().default(null),
@@ -96,6 +101,8 @@ export const updateQuoteInputSchema = z.object({
   // service fills this in on its own.
   initial_quoted_premium: optionalPremiumField,
   commission: optionalPremiumField,
+  fee: optionalPremiumField,
+  policy_type: z.string().trim().nullable().optional(),
   outcome: quoteOutcomeSchema.nullable().optional(),
 });
 

@@ -52,6 +52,18 @@ export const QUOTE_INSURERS = [
 
 export const QUOTE_TYPES = ["New Business", "Renewal"] as const;
 
+// The product, as it appears on the commission spreadsheet — not to be
+// confused with QUOTE_TYPES, which is whether it is new or a renewal. Motor
+// trade is the bulk of the book; the rest are occasional, and anything not
+// listed can be typed in.
+export const POLICY_TYPES = [
+  "Motor Trade Combined",
+  "Road Risks",
+  "Fleet",
+  "Contractors Combined",
+  "Property Owners",
+] as const;
+
 export type UrgencyLevel = "none" | "amber" | "red";
 
 export function getDaysInStage(stageEnteredAt: string | Date): number {

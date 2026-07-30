@@ -9,6 +9,7 @@ import {
 } from "../actions/quotes";
 import {
   CLOSED_STAGE,
+  POLICY_TYPES,
   QUOTE_INSURERS,
   QUOTE_STAGES,
   QUOTE_TYPES,
@@ -35,6 +36,8 @@ type QuoteBoardProps = {
 const NEW_CLIENT = "__new__";
 // The list covers the usual panel, not every insurer that can quote.
 const OTHER_INSURER = "__other__";
+// Same idea for the product: the list covers the book, not every cover there is.
+const OTHER_POLICY = "__other_policy__";
 
 const OUTCOMES: QuoteOutcome[] = ["Won", "Lost", "NTU"];
 
@@ -49,6 +52,8 @@ const emptyForm = {
   insurer: "",
   other_insurer: "",
   quote_type: "New Business",
+  policy_type: "Motor Trade Combined",
+  other_policy_type: "",
   submission_date: todayIso(),
   target_premium: "",
   notes: "",
@@ -79,6 +84,10 @@ function AddQuoteForm({
   const addingNew = form.business_id === NEW_CLIENT;
   const otherInsurer = form.insurer === OTHER_INSURER;
   const insurerName = otherInsurer ? form.other_insurer.trim() : form.insurer;
+  const otherPolicy = form.policy_type === OTHER_POLICY;
+  const policyName = otherPolicy
+    ? form.other_policy_type.trim()
+    : form.policy_type;
 
   function update<Key extends keyof typeof form>(key: Key, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -93,6 +102,7 @@ function AddQuoteForm({
           client_name: addingNew ? form.client_name : "",
           insurer: insurerName,
           quote_type: form.quote_type,
+          policy_type: policyName,
           submission_date: form.submission_date,
           target_premium: form.target_premium,
           notes: form.notes,
@@ -194,6 +204,36 @@ function AddQuoteForm({
               </option>
             ))}
           </select>
+        </label>
+        <label className="block">
+          <span className="block text-sm font-medium text-slate-950">
+            Policy type
+          </span>
+          {/* The product, which is what the commission return reports on. */}
+          <select
+            value={form.policy_type}
+            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+            onChange={(event) => update("policy_type", event.target.value)}
+          >
+            {POLICY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+            <option value={OTHER_POLICY}>+ Other cover</option>
+          </select>
+          {otherPolicy ? (
+            <input
+              type="text"
+              autoFocus
+              value={form.other_policy_type}
+              placeholder="e.g. Cyber"
+              className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) =>
+                update("other_policy_type", event.target.value)
+              }
+            />
+          ) : null}
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">

@@ -55,6 +55,7 @@ export type InsertQuoteRow = {
   last_year_premium: number | null;
   quoted_premium: number | null;
   initial_quoted_premium: number | null;
+  policy_type: string | null;
 };
 
 export async function insertQuote(

@@ -33,9 +33,21 @@ import type {
 import type { QuoteWithClient } from "../../lib/schemas/quote";
 import {
   formatMoney,
+  quarterKey,
+  quarterLabel,
+  quarterOf,
   quarterlyTotals,
   sumWon,
 } from "../../lib/reporting";
+import {
+  COMMISSION_COLUMNS,
+  type CommissionRow,
+  commissionRowsForQuarter,
+  commissionTotals,
+  formatCommissionMoney,
+  formatCommissionTsv,
+  quartersWithWins,
+} from "../../lib/commission";
 
 type ProspectBoardPanelProps = {
   businesses: Business[];
@@ -45,7 +57,220 @@ type ProspectBoardPanelProps = {
 
 // Won and lost firms are still prospects that reached the end, so they live
 // here rather than in a separate tool — just not mixed into the working list.
-type BoardTab = "pipeline" | "won" | "lost";
+type BoardTab = "pipeline" | "won" | "lost" | "commission";
+
+// The quarterly return that goes to the manager. Column for column this is the
+// spreadsheet it replaces, so what comes out pastes back into it.
+function CommissionReport({
+  quotes,
+  onChanged,
+}: {
+  quotes: QuoteWithClient[];
+  onChanged: () => void;
+}) {
+  const today = todayIso();
+  const current = quarterOf(today) ?? { year: 2026, quarter: 1 as const };
+  const quarters = useMemo(
+    () => quartersWithWins(quotes, current),
+    [quotes, current.year, current.quarter],
+  );
+  const [selected, setSelected] = useState(quarterKey(current));
+  const [copied, setCopied] = useState(false);
+
+  const quarter =
+    quarters.find((period) => quarterKey(period) === selected) ?? current;
+  const rows = useMemo(
+    () => commissionRowsForQuarter(quotes, quarter),
+    [quotes, quarter.year, quarter.quarter],
+  );
+  const totals = useMemo(() => commissionTotals(rows), [rows]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(formatCommissionTsv(rows, quarter));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <select
+            value={selected}
+            aria-label="Quarter"
+            className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+            onChange={(event) => setSelected(event.target.value)}
+          >
+            {quarters.map((period) => (
+              <option key={quarterKey(period)} value={quarterKey(period)}>
+                {quarterLabel(period)}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-slate-500">
+            {rows.length} won deal{rows.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <button
+          type="button"
+          disabled={rows.length === 0}
+          className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
+          onClick={copy}
+        >
+          {copied ? "Copied — paste into Excel" : "Copy for Excel"}
+        </button>
+      </div>
+
+      {totals.missingCommission > 0 ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {totals.missingCommission} won deal
+          {totals.missingCommission === 1 ? " has" : "s have"} no commission
+          recorded, so this return is short until you fill them in.
+        </div>
+      ) : null}
+
+      {rows.length === 0 ? (
+        <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
+          Nothing won in {quarterLabel(quarter)} yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+          <table className="w-full min-w-[56rem] text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                {COMMISSION_COLUMNS.map((column, index) => (
+                  <th
+                    key={column}
+                    className={`px-4 py-3 font-medium ${index >= 3 ? "text-right" : ""}`}
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <CommissionRowView
+                  key={row.quoteId}
+                  row={row}
+                  onChanged={onChanged}
+                />
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-300 font-semibold text-slate-950">
+                <td className="px-4 py-3" colSpan={3}>
+                  Total {quarterLabel(quarter)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {formatMoney(totals.grossPremium)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {formatMoney(totals.commissionIncome)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {formatMoney(totals.feeIncome)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {formatMoney(totals.totalIncome)}
+                </td>
+                <td className="px-4 py-3 text-right text-emerald-700">
+                  {formatMoney(totals.share)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+function CommissionRowView({
+  row,
+  onChanged,
+}: {
+  row: CommissionRow;
+  onChanged: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [fee, setFee] = useState(
+    row.feeIncome == null ? "" : String(row.feeIncome),
+  );
+  const [commission, setCommission] = useState(
+    row.commissionIncome == null ? "" : String(row.commissionIncome),
+  );
+
+  function save(changes: Record<string, unknown>) {
+    startTransition(async () => {
+      await updateQuoteAction({ id: row.quoteId, ...changes });
+      onChanged();
+    });
+  }
+
+  const cell =
+    "min-h-9 w-24 rounded-md border bg-white px-2 py-1 text-right text-sm text-slate-950";
+
+  return (
+    <tr className="border-b border-slate-100 last:border-0">
+      <td className="px-4 py-3 font-medium text-slate-950">
+        {row.policyholder}
+      </td>
+      <td className="px-4 py-3 text-slate-600">{row.policyType || "—"}</td>
+      <td className="px-4 py-3 text-slate-600">{row.insurer}</td>
+      <td className="px-4 py-3 text-right text-slate-600">
+        {formatCommissionMoney(row.grossPremium)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <input
+          type="number"
+          value={commission}
+          placeholder="0.00"
+          disabled={isPending}
+          aria-label={`Commission income for ${row.policyholder}`}
+          className={`${cell} ${row.commissionIncome == null ? "border-amber-400" : "border-slate-300"}`}
+          onChange={(event) => setCommission(event.target.value)}
+          onBlur={() => {
+            const current =
+              row.commissionIncome == null ? "" : String(row.commissionIncome);
+
+            if (commission.trim() !== current) {
+              save({ commission });
+            }
+          }}
+        />
+      </td>
+      <td className="px-4 py-3 text-right">
+        <input
+          type="number"
+          value={fee}
+          placeholder="0.00"
+          disabled={isPending}
+          aria-label={`Fee income for ${row.policyholder}`}
+          className={`${cell} border-slate-300`}
+          onChange={(event) => setFee(event.target.value)}
+          onBlur={() => {
+            const current = row.feeIncome == null ? "" : String(row.feeIncome);
+
+            if (fee.trim() !== current) {
+              save({ fee });
+            }
+          }}
+        />
+      </td>
+      <td className="px-4 py-3 text-right text-slate-600">
+        {formatMoney(row.totalIncome)}
+      </td>
+      <td className="px-4 py-3 text-right font-medium text-emerald-700">
+        {formatMoney(row.share)}
+      </td>
+    </tr>
+  );
+}
 
 const statusPill: Record<BusinessPipelineStatus, string> = {
   prospect: "bg-slate-100 text-slate-600",
@@ -1268,6 +1493,7 @@ export function ProspectBoardPanel({
             ["pipeline", `Pipeline (${live.length})`],
             ["won", `Won (${closed.won.length})`],
             ["lost", `Lost (${closed.lost.length})`],
+            ["commission", "Commission"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -1285,7 +1511,11 @@ export function ProspectBoardPanel({
         ))}
       </div>
 
-      {tab !== "pipeline" ? (
+      {tab === "commission" ? (
+        <CommissionReport quotes={quotes} onChanged={refresh} />
+      ) : null}
+
+      {tab === "won" || tab === "lost" ? (
         <>
           {tab === "won" ? (
             <>
@@ -1308,7 +1538,7 @@ export function ProspectBoardPanel({
             </>
           ) : null}
           <ClosedList
-            businesses={closed[tab]}
+            businesses={closed[tab as "won" | "lost"]}
             quotes={quotes}
             outcomeLabel={tab === "won" ? "Won" : "Lost"}
             onChanged={refresh}

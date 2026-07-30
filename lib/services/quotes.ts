@@ -67,6 +67,7 @@ export async function createQuoteWorkflow(
     business_id: business.id,
     insurer: data.insurer,
     quote_type: data.quote_type,
+    policy_type: data.policy_type,
     submission_date: data.submission_date,
     stage: data.stage,
     notes: data.notes,
