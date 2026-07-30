@@ -11,6 +11,7 @@ import {
   updateBusinessAction,
 } from "../actions/businesses";
 import { updateQuoteAction } from "../actions/quotes";
+import { PolicyTypeField } from "../policy-type-field";
 import {
   BOARD_VIEWS,
   type BoardSort,
@@ -220,7 +221,19 @@ function CommissionRowView({
       <td className="px-4 py-3 font-medium text-slate-950">
         {row.policyholder}
       </td>
-      <td className="px-4 py-3 text-slate-600">{row.policyType || "—"}</td>
+      {/* Set once when the quote was raised, so it is fixable here — this is
+          the column the return is wrong in, on the screen it is read from. */}
+      <td className="px-4 py-3 text-slate-600">
+        <PolicyTypeField
+          value={row.policyType}
+          disabled={isPending}
+          label={`Policy type for ${row.policyholder}`}
+          className={`min-h-9 w-44 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
+            row.policyType === "" ? "border-amber-400" : "border-slate-300"
+          }`}
+          onSave={(policy_type) => save({ policy_type: policy_type || null })}
+        />
+      </td>
       <td className="px-4 py-3 text-slate-600">{row.insurer}</td>
       <td className="px-4 py-3 text-right text-slate-600">
         {formatCommissionMoney(row.grossPremium)}

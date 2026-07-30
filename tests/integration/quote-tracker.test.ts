@@ -247,6 +247,40 @@ test("editing one field leaves the other premiums alone", async () => {
   assert.equal(closed?.last_year_premium, 2900);
 });
 
+test("the policy type can be corrected after the quote is closed", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  // A quote raised before the product was recorded — which is every win
+  // already on the board.
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+    policy_type: null,
+    quoted_premium: "4200",
+  });
+
+  await updateQuoteWorkflow(USER, { id: quote.id, outcome: "Won" });
+
+  const named = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    policy_type: "Contractors Combined",
+  });
+
+  assert.equal(named?.policy_type, "Contractors Combined");
+  assert.equal(named?.outcome, "Won", "correcting it does not reopen the quote");
+  assert.equal(named?.quoted_premium, 4200, "nor disturb the figures");
+
+  // Free text, for a cover that is not on the list.
+  const typed = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    policy_type: "Cyber",
+  });
+
+  assert.equal(typed?.policy_type, "Cyber");
+});
+
 test("a premium can still be deliberately cleared", async () => {
   resetStore();
   const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();

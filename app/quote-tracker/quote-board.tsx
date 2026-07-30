@@ -19,6 +19,7 @@ import {
   getUrgency,
   type UrgencyLevel,
 } from "../../lib/quote-tracker";
+import { PolicyTypeField } from "../policy-type-field";
 import type {
   QuoteOutcome,
   QuoteWithClient,
@@ -291,6 +292,42 @@ const outcomeBadge: Record<QuoteOutcome, string> = {
   NTU: "bg-slate-200 text-slate-600",
 };
 
+// The typed-in fields, held as a draft so several can be corrected in one
+// visit and written together.
+type Draft = { quoted: string; commission: string; policyType: string };
+
+function draftOf(quote: QuoteWithClient): Draft {
+  return {
+    quoted: quote.quoted_premium == null ? "" : String(quote.quoted_premium),
+    commission: quote.commission == null ? "" : String(quote.commission),
+    policyType: quote.policy_type ?? "",
+  };
+}
+
+// Only what was actually changed is sent, so a field left alone is never
+// written back over.
+function pendingChanges(
+  draft: Draft,
+  stored: Draft,
+  isWon: boolean,
+): Record<string, string | null> {
+  const changes: Record<string, string | null> = {};
+
+  if (draft.quoted.trim() !== stored.quoted) {
+    changes.quoted_premium = draft.quoted;
+  }
+
+  if (isWon && draft.commission.trim() !== stored.commission) {
+    changes.commission = draft.commission;
+  }
+
+  if (draft.policyType !== stored.policyType) {
+    changes.policy_type = draft.policyType || null;
+  }
+
+  return changes;
+}
+
 function QuoteCard({
   quote,
   onChanged,
@@ -299,14 +336,25 @@ function QuoteCard({
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [quoted, setQuoted] = useState(
-    quote.quoted_premium == null ? "" : String(quote.quoted_premium),
-  );
-  const [commission, setCommission] = useState(
-    quote.commission == null ? "" : String(quote.commission),
-  );
+  const [draft, setDraft] = useState(() => draftOf(quote));
+  const [savedAt, setSavedAt] = useState(quote.updated_at);
   const [armed, setArmed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const stored = draftOf(quote);
+  const changes = pendingChanges(draft, stored, quote.outcome === "Won");
+  const dirty = Object.keys(changes).length > 0;
+
+  // The row has been written since these boxes were filled in, so they go back
+  // to what was actually stored — while the card stays open where it is.
+  // Unsaved typing is left alone: a stage or outcome change mid-edit must not
+  // quietly throw away a figure that has not been saved yet.
+  if (savedAt !== quote.updated_at) {
+    setSavedAt(quote.updated_at);
+
+    if (!dirty) {
+      setDraft(stored);
+    }
+  }
   const urgency = getUrgency(quote.stage, quote.stage_entered_at, quote.outcome);
   const days = getDaysInStage(quote.stage_entered_at);
   // Only worth showing once a negotiation has actually moved the price.
@@ -324,24 +372,16 @@ function QuoteCard({
     });
   }
 
-  function commitQuoted() {
-    const current = quote.quoted_premium == null ? "" : String(quote.quoted_premium);
-
-    if (quoted.trim() === current) {
-      return;
-    }
-
-    run(() => updateQuoteAction({ id: quote.id, quoted_premium: quoted }));
+  function update(key: keyof Draft, value: string) {
+    setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function commitCommission() {
-    const current = quote.commission == null ? "" : String(quote.commission);
-
-    if (commission.trim() === current) {
+  function saveChanges() {
+    if (!dirty) {
       return;
     }
 
-    run(() => updateQuoteAction({ id: quote.id, commission }));
+    run(() => updateQuoteAction({ id: quote.id, ...changes }));
   }
 
   // Collapsed, a card is a name, where it stands and how long it has stood
@@ -419,12 +459,11 @@ function QuoteCard({
             <span className="block text-xs text-slate-600">Quoted £</span>
             <input
               type="number"
-              value={quoted}
+              value={draft.quoted}
               placeholder="0.00"
               disabled={isPending}
               className="mt-1 min-h-9 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-950"
-              onChange={(event) => setQuoted(event.target.value)}
-              onBlur={commitQuoted}
+              onChange={(event) => update("quoted", event.target.value)}
             />
           </label>
           {reducedFrom != null ? (
@@ -443,7 +482,7 @@ function QuoteCard({
               <span className="block text-xs text-slate-600">Commission £</span>
               <input
                 type="number"
-                value={commission}
+                value={draft.commission}
                 placeholder="0.00"
                 disabled={isPending}
                 className={`mt-1 min-h-9 w-full rounded-md border bg-white px-2 py-1 text-xs text-slate-950 ${
@@ -451,11 +490,36 @@ function QuoteCard({
                     ? "border-amber-400"
                     : "border-slate-300"
                 }`}
-                onChange={(event) => setCommission(event.target.value)}
-                onBlur={commitCommission}
+                onChange={(event) => update("commission", event.target.value)}
               />
             </label>
           ) : null}
+
+          {/* The product, which the commission return reports on. Editable
+              here because it is set once at submission and easily missed. */}
+          <label className="mt-2 block">
+            <span className="block text-xs text-slate-600">Policy type</span>
+            <PolicyTypeField
+              value={draft.policyType}
+              disabled={isPending}
+              label={`Policy type for ${quote.client_name}`}
+              className={`mt-1 min-h-9 w-full rounded-md border bg-white px-2 py-1 text-xs text-slate-950 ${
+                draft.policyType === "" ? "border-amber-400" : "border-slate-300"
+              }`}
+              onSave={(next) => update("policyType", next)}
+            />
+          </label>
+
+          {/* Typed-in figures are saved together, so coming back to a closed
+              quote to correct two numbers is one visit, not two. */}
+          <button
+            type="button"
+            disabled={!dirty || isPending}
+            className="mt-3 min-h-9 w-full rounded-md bg-brand-700 px-2 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:bg-slate-100 disabled:text-slate-400"
+            onClick={saveChanges}
+          >
+            {isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
+          </button>
 
           <select
             value={quote.outcome ?? ""}
@@ -617,9 +681,10 @@ export function QuoteBoard({
                 ) : (
                   stageQuotes.map((quote) => (
                     <QuoteCard
-                      // Remount on save so the premium box reflects what was
-                      // actually stored.
-                      key={`${quote.id}:${quote.updated_at}`}
+                      // Keyed by id alone: a save must not remount the card,
+                      // or it would snap shut mid-edit. The card refills its
+                      // own boxes from the saved row instead.
+                      key={quote.id}
                       quote={quote}
                       onChanged={refresh}
                     />
