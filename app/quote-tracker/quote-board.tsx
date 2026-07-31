@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  createQuoteAction,
+  createQuotesAction,
   deleteQuoteAction,
   updateQuoteAction,
 } from "../actions/quotes";
@@ -15,8 +15,10 @@ import {
   QUOTE_TYPES,
   STAGE_ACTIONS,
   STAGE_LABELS,
+  type SubmissionGroup,
   getDaysInStage,
   getUrgency,
+  groupBySubmission,
   type UrgencyLevel,
 } from "../../lib/quote-tracker";
 import { PolicyTypeField } from "../policy-type-field";
@@ -36,8 +38,6 @@ type QuoteBoardProps = {
 
 // Sentinel for the "not on my board yet" option in the client picker.
 const NEW_CLIENT = "__new__";
-// The list covers the usual panel, not every insurer that can quote.
-const OTHER_INSURER = "__other__";
 // Same idea for the product: the list covers the book, not every cover there is.
 const OTHER_POLICY = "__other_policy__";
 
@@ -51,7 +51,7 @@ function todayIso(): string {
 const emptyForm = {
   business_id: "",
   client_name: "",
-  insurer: "",
+  insurers: [] as string[],
   other_insurer: "",
   quote_type: "New Business",
   policy_type: "Motor Trade Combined",
@@ -84,25 +84,38 @@ function AddQuoteForm({
   const [isPending, startTransition] = useTransition();
   const sorted = [...businesses].sort((a, b) => a.name.localeCompare(b.name));
   const addingNew = form.business_id === NEW_CLIENT;
-  const otherInsurer = form.insurer === OTHER_INSURER;
-  const insurerName = otherInsurer ? form.other_insurer.trim() : form.insurer;
   const otherPolicy = form.policy_type === OTHER_POLICY;
   const policyName = otherPolicy
     ? form.other_policy_type.trim()
     : form.policy_type;
+  // The typed-in insurer counts as picked without a second click, so filling
+  // the box and pressing Add cannot silently drop it.
+  const typedInsurer = form.other_insurer.trim();
+  const insurers = typedInsurer
+    ? [...form.insurers, typedInsurer]
+    : form.insurers;
 
   function update<Key extends keyof typeof form>(key: Key, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleInsurer(insurer: string) {
+    setForm((current) => ({
+      ...current,
+      insurers: current.insurers.includes(insurer)
+        ? current.insurers.filter((name) => name !== insurer)
+        : [...current.insurers, insurer],
+    }));
   }
 
   function handleSubmit() {
     setError(null);
     startTransition(async () => {
       try {
-        await createQuoteAction({
+        await createQuotesAction({
           business_id: addingNew ? "" : form.business_id,
           client_name: addingNew ? form.client_name : "",
-          insurer: insurerName,
+          insurers,
           quote_type: form.quote_type,
           policy_type: policyName,
           submission_date: form.submission_date,
@@ -125,7 +138,7 @@ function AddQuoteForm({
     ? form.client_name.trim() !== ""
     : form.business_id !== "";
   const canSubmit =
-    hasClient && insurerName !== "" && form.submission_date !== "";
+    hasClient && insurers.length > 0 && form.submission_date !== "";
 
   return (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-5 sm:px-5">
@@ -163,34 +176,42 @@ function AddQuoteForm({
             />
           ) : null}
         </label>
-        <label className="block">
-          <span className="block text-sm font-medium text-slate-950">
-            Insurer
-          </span>
-          <select
-            value={form.insurer}
+        {/* A risk goes out to several insurers at once, so this is a pick-many
+            rather than a dropdown. Each one gets its own card. */}
+        <fieldset className="block md:col-span-2 lg:col-span-3">
+          <legend className="text-sm font-medium text-slate-950">
+            Insurers ({insurers.length} selected)
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {QUOTE_INSURERS.map((insurer) => {
+              const picked = form.insurers.includes(insurer);
+
+              return (
+                <button
+                  key={insurer}
+                  type="button"
+                  aria-pressed={picked}
+                  className={`min-h-11 rounded-md border px-3 py-2 text-sm ${
+                    picked
+                      ? "border-brand-700 bg-brand-700 font-medium text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                  onClick={() => toggleInsurer(insurer)}
+                >
+                  {insurer}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            type="text"
+            value={form.other_insurer}
+            placeholder="Another insurer not listed"
+            aria-label="Another insurer not listed"
             className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-            onChange={(event) => update("insurer", event.target.value)}
-          >
-            <option value="">Select insurer</option>
-            {QUOTE_INSURERS.map((insurer) => (
-              <option key={insurer} value={insurer}>
-                {insurer}
-              </option>
-            ))}
-            <option value={OTHER_INSURER}>+ Other insurer</option>
-          </select>
-          {otherInsurer ? (
-            <input
-              type="text"
-              autoFocus
-              value={form.other_insurer}
-              placeholder="Type the insurer"
-              className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-              onChange={(event) => update("other_insurer", event.target.value)}
-            />
-          ) : null}
-        </label>
+            onChange={(event) => update("other_insurer", event.target.value)}
+          />
+        </fieldset>
         <label className="block">
           <span className="block text-sm font-medium text-slate-950">
             Quote type
@@ -280,7 +301,9 @@ function AddQuoteForm({
           onClick={handleSubmit}
           disabled={!canSubmit || isPending}
         >
-          {isPending ? "Adding..." : "Add quote"}
+          {isPending
+            ? "Adding..."
+            : `Add quote${insurers.length === 1 ? "" : "s"}`}
         </button>
       </div>
     </div>
@@ -582,6 +605,63 @@ function QuoteCard({
   );
 }
 
+// Several insurers of the same submission sitting in the same stage. They
+// stack under one heading so the day a risk goes out reads as one line per
+// client rather than one per insurer — the worst flag among them shows on the
+// heading, so nothing needing a chase can hide inside a collapsed stack.
+function SubmissionStack({
+  group,
+  onChanged,
+}: {
+  group: SubmissionGroup<QuoteWithClient>;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const urgencies = group.quotes.map((quote) =>
+    getUrgency(quote.stage, quote.stage_entered_at, quote.outcome),
+  );
+  const worst: UrgencyLevel = urgencies.includes("red")
+    ? "red"
+    : urgencies.includes("amber")
+      ? "amber"
+      : "none";
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50">
+      <button
+        type="button"
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-slate-950">
+            {group.clientName}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-slate-500">
+            {group.quotes.length} insurers ·{" "}
+            {group.quotes.map((quote) => quote.insurer).join(", ")}
+          </span>
+        </span>
+        {worst === "none" ? null : (
+          <span
+            className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${urgencyDot[worst]}`}
+            title="One of these needs chasing"
+          />
+        )}
+      </button>
+
+      {open ? (
+        <div className="flex flex-col gap-2 px-2 pb-2">
+          {group.quotes.map((quote) => (
+            <QuoteCard key={quote.id} quote={quote} onChanged={onChanged} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function QuoteBoard({
   quotes,
   businesses,
@@ -680,16 +760,24 @@ export function QuoteBoard({
                     Nothing here
                   </p>
                 ) : (
-                  stageQuotes.map((quote) => (
-                    <QuoteCard
-                      // Keyed by id alone: a save must not remount the card,
-                      // or it would snap shut mid-edit. The card refills its
-                      // own boxes from the saved row instead.
-                      key={quote.id}
-                      quote={quote}
-                      onChanged={refresh}
-                    />
-                  ))
+                  groupBySubmission(stageQuotes).map((group) =>
+                    group.quotes.length === 1 ? (
+                      <QuoteCard
+                        // Keyed by id alone: a save must not remount the card,
+                        // or it would snap shut mid-edit. The card refills its
+                        // own boxes from the saved row instead.
+                        key={group.quotes[0].id}
+                        quote={group.quotes[0]}
+                        onChanged={refresh}
+                      />
+                    ) : (
+                      <SubmissionStack
+                        key={group.key}
+                        group={group}
+                        onChanged={refresh}
+                      />
+                    ),
+                  )
                 )}
               </div>
             </div>

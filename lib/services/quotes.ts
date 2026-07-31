@@ -1,8 +1,10 @@
 import "server-only";
 
 import {
+  type Quote,
   type QuoteWithClient,
   createQuoteInputSchema,
+  createQuotesInputSchema,
   deleteQuoteInputSchema,
   updateQuoteInputSchema,
 } from "../schemas/quote";
@@ -11,6 +13,7 @@ import {
   getQuoteById,
   insertQuote,
   listQuotes,
+  listQuotesForBusiness,
   updateQuoteRow,
 } from "../repositories/quotes";
 import {
@@ -40,15 +43,18 @@ export async function listQuotesWithClientsWorkflow(
   }));
 }
 
-export async function createQuoteWorkflow(
+// One submission, one card per insurer: they come back separately, at their
+// own pace and with their own price, so each needs its own stage and its own
+// SLA clock. What they share is the client and the date it went out.
+export async function createQuotesWorkflow(
   userId: string,
   input: unknown,
-): Promise<QuoteWithClient> {
-  const data = createQuoteInputSchema.parse(input);
+): Promise<QuoteWithClient[]> {
+  const data = createQuotesInputSchema.parse(input);
 
   // A picked firm attaches by id, which is exact. A typed name falls back to
   // find-or-create, which matches on the name and so can only ever be as good
-  // as the spelling.
+  // as the spelling. Resolved once, so five insurers cannot become five firms.
   const business = data.business_id
     ? await getBusinessById(userId, data.business_id)
     : await findOrCreateBusinessByName(userId, data.client_name, {
@@ -63,21 +69,40 @@ export async function createQuoteWorkflow(
     await updateBusinessPipelineStatus(userId, business.id, "quoting");
   }
 
-  const quote = await insertQuote(userId, {
-    business_id: business.id,
-    insurer: data.insurer,
-    quote_type: data.quote_type,
-    policy_type: data.policy_type,
-    submission_date: data.submission_date,
-    stage: data.stage,
-    notes: data.notes,
-    target_premium: data.target_premium,
-    last_year_premium: data.last_year_premium,
-    quoted_premium: data.quoted_premium,
-    initial_quoted_premium: data.quoted_premium,
+  const quotes: QuoteWithClient[] = [];
+
+  for (const insurer of data.insurers) {
+    const quote = await insertQuote(userId, {
+      business_id: business.id,
+      insurer,
+      quote_type: data.quote_type,
+      policy_type: data.policy_type,
+      submission_date: data.submission_date,
+      stage: data.stage,
+      notes: data.notes,
+      target_premium: data.target_premium,
+      last_year_premium: data.last_year_premium,
+      quoted_premium: data.quoted_premium,
+      initial_quoted_premium: data.quoted_premium,
+    });
+
+    quotes.push({ ...quote, client_name: business.name });
+  }
+
+  return quotes;
+}
+
+export async function createQuoteWorkflow(
+  userId: string,
+  input: unknown,
+): Promise<QuoteWithClient> {
+  const { insurer, ...rest } = createQuoteInputSchema.parse(input);
+  const [quote] = await createQuotesWorkflow(userId, {
+    ...rest,
+    insurers: [insurer],
   });
 
-  return { ...quote, client_name: business.name };
+  return quote;
 }
 
 export async function updateQuoteWorkflow(
@@ -138,14 +163,64 @@ export async function updateQuoteWorkflow(
   // A won/lost outcome flips the shared client record to match, so the
   // dashboard's "won clients" reflects it without re-entry.
   if (changes.outcome === "Won") {
+    // Placing the risk with one insurer settles the whole submission: the
+    // others are not taken up, and should stop sitting on the board asking to
+    // be chased.
+    await closeSiblingQuotes(userId, updated);
     await updateBusinessPipelineStatus(userId, updated.business_id, "won");
   } else if (changes.outcome === "Lost" || changes.outcome === "NTU") {
-    await updateBusinessPipelineStatus(userId, updated.business_id, "lost");
+    // But a loser closing must never demote a client whose business was won
+    // on another insurer's quote — otherwise settling a submission would mark
+    // the firm lost a moment after marking it won.
+    const stillWon = await hasWonQuote(userId, updated.business_id);
+
+    if (!stillWon) {
+      await updateBusinessPipelineStatus(userId, updated.business_id, "lost");
+    }
   }
 
   const business = await getBusinessById(userId, updated.business_id);
 
   return { ...updated, client_name: business?.name ?? "Unknown client" };
+}
+
+// The rest of the same submission — the other insurers the risk went out to
+// on the same day, that are still waiting on an answer.
+async function closeSiblingQuotes(
+  userId: string,
+  winner: Quote,
+): Promise<void> {
+  const siblings = await listQuotesForBusiness(userId, winner.business_id);
+  const closedAt = todayIso();
+
+  for (const sibling of siblings) {
+    const sameSubmission =
+      sibling.id !== winner.id &&
+      sibling.submission_date === winner.submission_date &&
+      sibling.outcome === null;
+
+    if (!sameSubmission) {
+      continue;
+    }
+
+    // Written straight to the row rather than back through this workflow, so
+    // closing them cannot cascade into another round of status changes.
+    await updateQuoteRow(userId, sibling.id, {
+      outcome: "NTU",
+      stage: CLOSED_STAGE,
+      closed_at: closedAt,
+      stage_entered_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function hasWonQuote(
+  userId: string,
+  businessId: string,
+): Promise<boolean> {
+  const quotes = await listQuotesForBusiness(userId, businessId);
+
+  return quotes.some((quote) => quote.outcome === "Won");
 }
 
 export async function deleteQuoteWorkflow(

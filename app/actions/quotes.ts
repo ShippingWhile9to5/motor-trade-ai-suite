@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "../../lib/auth";
 import {
-  createQuoteWorkflow,
+  createQuotesWorkflow,
   deleteQuoteWorkflow,
   listQuotesWithClientsWorkflow,
   updateQuoteWorkflow,
@@ -26,15 +26,17 @@ export async function listQuotesAction(): Promise<QuoteWithClient[]> {
   return listQuotesWithClientsWorkflow(userId);
 }
 
-export async function createQuoteAction(
+// One submission to several insurers, created together so they share a client
+// and a date — and so a typed client name resolves to one firm, not several.
+export async function createQuotesAction(
   input: unknown,
-): Promise<QuoteWithClient> {
+): Promise<QuoteWithClient[]> {
   const userId = await currentUserId();
-  const quote = await createQuoteWorkflow(userId, input);
+  const quotes = await createQuotesWorkflow(userId, input);
 
   revalidatePath("/quote-tracker");
 
-  return quote;
+  return quotes;
 }
 
 export async function updateQuoteAction(

@@ -451,3 +451,184 @@ test("quotes are scoped to their owner", async () => {
   assert.equal(aRows.length, 1);
   assert.equal(aRows[0].client_name, "A Motors");
 });
+
+test("one submission to several insurers makes a card each, on one firm", async () => {
+  resetStore();
+  const { createQuotesWorkflow, listBusinessesWorkflow } = loadServices();
+
+  const quotes = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Jensten", "Unicorn"],
+    submission_date: "2026-07-24",
+    target_premium: "3200",
+  });
+
+  assert.equal(quotes.length, 4);
+  assert.deepEqual(
+    quotes.map((quote) => quote.insurer),
+    ["NIG", "Covea", "Jensten", "Unicorn"],
+  );
+
+  // Everything but the insurer is shared, because it is one risk going out.
+  for (const quote of quotes) {
+    assert.equal(quote.client_name, "Brookway Cars Ltd");
+    assert.equal(quote.submission_date, "2026-07-24");
+    assert.equal(quote.target_premium, 3200);
+    assert.equal(quote.stage, 1);
+  }
+
+  const businesses = await listBusinessesWorkflow(USER);
+  const named = businesses.filter((firm) => firm.name === "Brookway Cars Ltd");
+
+  assert.equal(named.length, 1, "four insurers must not make four firms");
+  assert.equal(named[0].pipeline_status, "quoting");
+  assert.equal(
+    new Set(quotes.map((quote) => quote.business_id)).size,
+    1,
+    "and all four hang off it",
+  );
+});
+
+test("the same insurer picked twice only gets one card", async () => {
+  resetStore();
+  const { createQuotesWorkflow } = loadServices();
+
+  const quotes = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "NIG"],
+    submission_date: "2026-07-24",
+  });
+
+  assert.deepEqual(
+    quotes.map((quote) => quote.insurer),
+    ["NIG", "Covea"],
+  );
+});
+
+test("placing the risk with one insurer closes the rest as NTU", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [nig, covea, jensten] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Jensten"],
+    submission_date: "2026-07-24",
+  });
+
+  // One insurer has already declined by hand before the winner is picked.
+  await updateQuoteWorkflow(USER, { id: jensten.id, outcome: "Lost" });
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Won" });
+
+  const all = await listQuotesWithClientsWorkflow(USER);
+  const byId = new Map(all.map((quote) => [quote.id, quote]));
+
+  assert.equal(byId.get(nig.id)?.outcome, "Won");
+  assert.equal(byId.get(covea.id)?.outcome, "NTU", "closed on its own");
+  assert.equal(byId.get(covea.id)?.stage, 6, "and off the live board");
+  assert.equal(byId.get(covea.id)?.closed_at, "2026-07-31");
+  assert.equal(
+    byId.get(jensten.id)?.outcome,
+    "Lost",
+    "an outcome already set is left as it was",
+  );
+});
+
+test("winning leaves the client won, not lost by its own losing quotes", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listBusinessesWorkflow } =
+    loadServices();
+
+  const [nig, covea] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Won" });
+
+  const afterWin = await listBusinessesWorkflow(USER);
+
+  assert.equal(afterWin[0].pipeline_status, "won", "the NTU must not demote it");
+
+  // And closing a loser by hand afterwards must not demote it either.
+  await updateQuoteWorkflow(USER, { id: covea.id, outcome: "NTU" });
+
+  const afterClosing = await listBusinessesWorkflow(USER);
+
+  assert.equal(afterClosing[0].pipeline_status, "won");
+});
+
+test("losing every insurer still marks the client lost", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listBusinessesWorkflow } =
+    loadServices();
+
+  const [nig, covea] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Lost" });
+  await updateQuoteWorkflow(USER, { id: covea.id, outcome: "Lost" });
+
+  const businesses = await listBusinessesWorkflow(USER);
+
+  assert.equal(businesses[0].pipeline_status, "lost");
+});
+
+test("a separate submission for the same firm is left alone", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [nig] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-07-24",
+  });
+
+  // The same firm, a different risk, sent out on a different day.
+  const [aviva] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["Aviva"],
+    submission_date: "2026-09-01",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Won" });
+
+  const all = await listQuotesWithClientsWorkflow(USER);
+  const other = all.find((quote) => quote.id === aviva.id);
+
+  assert.equal(other?.outcome, null, "winning one risk does not close another");
+  assert.equal(other?.stage, 1);
+});
+
+test("cards group by submission, so a client is one line per stage", () => {
+  const { groupBySubmission } = require(
+    "../../lib/quote-tracker",
+  ) as typeof import("../../lib/quote-tracker");
+
+  const groups = groupBySubmission([
+    { business_id: "b1", submission_date: "2026-07-24", client_name: "Brookway", insurer: "NIG" },
+    { business_id: "b2", submission_date: "2026-07-24", client_name: "Marson", insurer: "NIG" },
+    { business_id: "b1", submission_date: "2026-07-24", client_name: "Brookway", insurer: "Covea" },
+    // Same firm, different day out — a different risk, kept apart.
+    { business_id: "b1", submission_date: "2026-09-01", client_name: "Brookway", insurer: "Aviva" },
+  ]);
+
+  assert.deepEqual(
+    groups.map((group) => [group.clientName, group.quotes.length]),
+    [
+      ["Brookway", 2],
+      ["Marson", 1],
+      ["Brookway", 1],
+    ],
+    "in the order they arrived, so the caller's sort still decides",
+  );
+  assert.deepEqual(
+    groups[0].quotes.map((quote) => quote.insurer),
+    ["NIG", "Covea"],
+  );
+});

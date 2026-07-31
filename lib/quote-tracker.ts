@@ -102,3 +102,54 @@ export function getUrgency(
 
   return "none";
 }
+
+// A submission is one risk sent out on one day, and each insurer it went to
+// has its own card. Grouping them puts a client on one line in a column
+// instead of five, which matters most on the day it goes out — when every
+// insurer is sitting in the same stage saying the same thing.
+export type SubmissionGroup<T> = {
+  key: string;
+  clientName: string;
+  submissionDate: string;
+  quotes: T[];
+};
+
+type Groupable = {
+  business_id: string;
+  submission_date: string;
+  client_name: string;
+};
+
+export function groupBySubmission<T extends Groupable>(
+  quotes: T[],
+): SubmissionGroup<T>[] {
+  const groups: SubmissionGroup<T>[] = [];
+  const byKey = new Map<string, SubmissionGroup<T>>();
+
+  for (const quote of quotes) {
+    // Keyed by the date as well as the firm, so a renewal quoted in March and
+    // a new risk quoted in July stay apart rather than merging into one pile.
+    const key = `${quote.business_id}:${quote.submission_date}`;
+    const existing = byKey.get(key);
+
+    if (existing) {
+      existing.quotes.push(quote);
+
+      continue;
+    }
+
+    // Order of first appearance, so the caller's sort still decides what sits
+    // at the top of a column.
+    const group: SubmissionGroup<T> = {
+      key,
+      clientName: quote.client_name,
+      submissionDate: quote.submission_date,
+      quotes: [quote],
+    };
+
+    byKey.set(key, group);
+    groups.push(group);
+  }
+
+  return groups;
+}

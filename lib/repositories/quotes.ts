@@ -28,6 +28,21 @@ export async function listQuotes(userId: string): Promise<Quote[]> {
   return (data ?? []).map(parseRow);
 }
 
+export async function listQuotesForBusiness(
+  userId: string,
+  businessId: string,
+): Promise<Quote[]> {
+  const { data, error } = await supabase
+    .from("quote")
+    .select(quoteSelect)
+    .eq("user_id", userId)
+    .eq("business_id", businessId);
+
+  throwSupabaseError(error);
+
+  return (data ?? []).map(parseRow);
+}
+
 export async function getQuoteById(
   userId: string,
   id: string,

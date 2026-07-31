@@ -65,27 +65,51 @@ const optionalPremiumField = premiumValue.optional();
 // Either pick an existing firm by id, or type a name for one that isn't on
 // the board yet. Picking by id is what the board's "Quote" button uses, and it
 // removes the chance of a near-miss name creating a duplicate firm.
-export const createQuoteInputSchema = z
-  .object({
-    business_id: z
-      .union([z.string().uuid(), z.literal(""), z.null()])
-      .optional()
-      .transform((value) => value || null),
-    client_name: z.string().trim().default(""),
-    insurer: z.string().trim().min(1, "Insurer is required."),
-    quote_type: z.string().trim().default("New Business"),
-    policy_type: z.string().trim().nullable().default("Motor Trade Combined"),
-    submission_date: z.string().trim().min(1, "Submission date is required."),
-    stage: z.number().int().min(1).max(6).default(1),
-    notes: z.string().trim().nullable().default(null),
-    target_premium: premiumField,
-    last_year_premium: premiumField,
-    quoted_premium: premiumField,
+const submissionFields = z.object({
+  business_id: z
+    .union([z.string().uuid(), z.literal(""), z.null()])
+    .optional()
+    .transform((value) => value || null),
+  client_name: z.string().trim().default(""),
+  quote_type: z.string().trim().default("New Business"),
+  policy_type: z.string().trim().nullable().default("Motor Trade Combined"),
+  submission_date: z.string().trim().min(1, "Submission date is required."),
+  stage: z.number().int().min(1).max(6).default(1),
+  notes: z.string().trim().nullable().default(null),
+  target_premium: premiumField,
+  last_year_premium: premiumField,
+  quoted_premium: premiumField,
+});
+
+function hasAClient(data: {
+  business_id: string | null;
+  client_name: string;
+}): boolean {
+  return data.business_id !== null || data.client_name !== "";
+}
+
+const noClient = {
+  message: "Pick a client, or type a name for a new one.",
+  path: ["client_name"] as PropertyKey[],
+};
+
+export const createQuoteInputSchema = submissionFields
+  .extend({ insurer: z.string().trim().min(1, "Insurer is required.") })
+  .refine(hasAClient, noClient);
+
+// A risk normally goes out to several insurers at once, and each replies in
+// its own time with its own price — so one submission becomes one quote per
+// insurer, sharing the client and the date it went out.
+export const createQuotesInputSchema = submissionFields
+  .extend({
+    insurers: z
+      .array(z.string().trim().min(1))
+      .min(1, "Pick at least one insurer.")
+      // The same insurer twice is a slip, and would put two identical cards
+      // on the board with nothing to tell them apart.
+      .transform((list) => Array.from(new Set(list))),
   })
-  .refine((data) => data.business_id !== null || data.client_name !== "", {
-    message: "Pick a client, or type a name for a new one.",
-    path: ["client_name"],
-  });
+  .refine(hasAClient, noClient);
 
 export const updateQuoteInputSchema = z.object({
   id: z.string().uuid(),
@@ -114,4 +138,5 @@ export type QuoteOutcome = z.infer<typeof quoteOutcomeSchema>;
 export type Quote = z.infer<typeof quoteSchema>;
 export type QuoteWithClient = z.infer<typeof quoteWithClientSchema>;
 export type CreateQuoteInput = z.infer<typeof createQuoteInputSchema>;
+export type CreateQuotesInput = z.infer<typeof createQuotesInputSchema>;
 export type UpdateQuoteInput = z.infer<typeof updateQuoteInputSchema>;
