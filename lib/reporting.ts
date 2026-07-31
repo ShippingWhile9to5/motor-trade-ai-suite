@@ -155,7 +155,19 @@ export function quarterlyTotals(
   return series;
 }
 
+// Money is shown to the penny, always. These are figures the broker types in
+// and reports on, so a rounded £631 standing for £630.75 is a wrong number,
+// not a tidier one.
 export function formatMoney(value: number): string {
+  return `£${value.toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+// The one place a rounded figure is honest: a bar on a chart is already an
+// approximation, and the exact amount is on its tooltip.
+export function formatMoneyRounded(value: number): string {
   return `£${value.toLocaleString("en-GB", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,

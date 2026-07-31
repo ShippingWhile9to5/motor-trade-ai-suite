@@ -34,6 +34,7 @@ import type {
 import type { QuoteWithClient } from "../../lib/schemas/quote";
 import {
   formatMoney,
+  formatMoneyRounded,
   quarterKey,
   quarterLabel,
   quarterOf,
@@ -1214,8 +1215,12 @@ function QuarterChart({ quotes }: { quotes: QuoteWithClient[] }) {
               className="flex flex-1 flex-col items-center gap-2"
               title={`${period.label}: ${formatMoney(period.commission)} from ${period.won} deal${period.won === 1 ? "" : "s"}`}
             >
+              {/* Rounded to keep the label inside a narrow bar — the exact
+                  figure is on the tooltip above. */}
               <span className="text-xs font-medium text-slate-600">
-                {period.commission > 0 ? formatMoney(period.commission) : ""}
+                {period.commission > 0
+                  ? formatMoneyRounded(period.commission)
+                  : ""}
               </span>
               <div
                 className={`w-full rounded-t ${

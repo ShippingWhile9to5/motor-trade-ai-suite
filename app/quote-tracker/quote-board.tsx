@@ -20,6 +20,7 @@ import {
   type UrgencyLevel,
 } from "../../lib/quote-tracker";
 import { PolicyTypeField } from "../policy-type-field";
+import { formatMoney } from "../../lib/reporting";
 import type {
   QuoteOutcome,
   QuoteWithClient,
@@ -403,7 +404,7 @@ function QuoteCard({
             </span>
             <span className="mt-0.5 block truncate text-xs text-slate-500">
               {quote.insurer}
-              {price != null ? ` · £${price.toFixed(0)}` : ""}
+              {price != null ? ` · ${formatMoney(price)}` : ""}
               {quote.outcome ? "" : ` · ${days}d`}
             </span>
           </span>
@@ -451,7 +452,7 @@ function QuoteCard({
           <p className="text-xs text-slate-500">
             {quote.quote_type}
             {quote.target_premium != null
-              ? ` · target £${quote.target_premium.toFixed(2)}`
+              ? ` · target ${formatMoney(quote.target_premium)}`
               : ""}
           </p>
 
@@ -471,7 +472,7 @@ function QuoteCard({
               className="mt-1 text-xs text-emerald-700"
               title="What the insurer first quoted"
             >
-              was £{reducedFrom.toFixed(2)}
+              was {formatMoney(reducedFrom)}
             </p>
           ) : null}
 

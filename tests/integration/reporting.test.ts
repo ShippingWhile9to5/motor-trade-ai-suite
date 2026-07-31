@@ -220,3 +220,48 @@ test("commission is stored against the quote", async () => {
   assert.equal(paid?.commission, 725.5);
   assert.equal(paid?.outcome, "Won", "recording commission leaves the rest alone");
 });
+
+test("money is shown to the penny, never rounded to the pound", () => {
+  const { formatMoney, formatMoneyRounded } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  // The figures the broker types in are reported back exactly as typed.
+  assert.equal(formatMoney(630.75), "£630.75");
+  assert.equal(formatMoney(630.5), "£630.50", "not rounded up to £631");
+  assert.equal(formatMoney(4200), "£4,200.00");
+  assert.equal(formatMoney(0), "£0.00");
+
+  // A chart bar is an approximation already, so its label may round.
+  assert.equal(formatMoneyRounded(630.75), "£631");
+});
+
+test("pence survive the round trip to storage and back", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = require(
+    "../../lib/services/quotes",
+  ) as typeof import("../../lib/services/quotes");
+  const { formatMoney } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-07-24",
+    target_premium: "3199.99",
+  });
+
+  const priced = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    quoted_premium: "4200.45",
+    commission: "630.75",
+    fee: "49.99",
+  });
+
+  assert.equal(priced?.quoted_premium, 4200.45);
+  assert.equal(priced?.commission, 630.75);
+  assert.equal(priced?.fee, 49.99);
+  assert.equal(priced?.target_premium, 3199.99);
+  assert.equal(formatMoney(priced?.commission ?? 0), "£630.75");
+});
