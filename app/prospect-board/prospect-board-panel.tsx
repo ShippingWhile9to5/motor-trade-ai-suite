@@ -35,19 +35,25 @@ import type { QuoteWithClient } from "../../lib/schemas/quote";
 import {
   formatMoney,
   formatMoneyRounded,
+  monthKey,
+  monthLabel,
+  monthOf,
+  monthlyTotals,
   quarterKey,
   quarterLabel,
   quarterOf,
-  quarterlyTotals,
+  quarterOfMonth,
   sumWon,
 } from "../../lib/reporting";
 import {
   COMMISSION_COLUMNS,
   type CommissionRow,
+  commissionRowsForMonth,
   commissionRowsForQuarter,
   commissionTotals,
   formatCommissionMoney,
   formatCommissionTsv,
+  monthsWithWins,
   quartersWithWins,
 } from "../../lib/commission";
 
@@ -74,24 +80,49 @@ function CommissionReport({
 }) {
   const today = todayIso();
   const current = quarterOf(today) ?? { year: 2026, quarter: 1 as const };
+  const currentMonth = monthOf(today) ?? { year: 2026, month: 1 };
+  // Commission is paid quarterly, so the quarter is what gets sent. The month
+  // is how the work is tracked in between.
+  const [grain, setGrain] = useState<"month" | "quarter">("quarter");
   const quarters = useMemo(
     () => quartersWithWins(quotes, current),
     [quotes, current.year, current.quarter],
   );
+  const months = useMemo(
+    () => monthsWithWins(quotes, currentMonth),
+    [quotes, currentMonth.year, currentMonth.month],
+  );
   const [selected, setSelected] = useState(openOn ?? quarterKey(current));
+  const [selectedMonth, setSelectedMonth] = useState(monthKey(currentMonth));
   const [copied, setCopied] = useState(false);
 
   const quarter =
     quarters.find((period) => quarterKey(period) === selected) ?? current;
+  const month =
+    months.find((period) => monthKey(period) === selectedMonth) ?? currentMonth;
+  // Whatever is on screen, the export is the quarter that period is reported
+  // in — a month is not a return, and the manager's sheet is quarterly.
+  const exported = grain === "month" ? quarterOfMonth(month) : quarter;
   const rows = useMemo(
-    () => commissionRowsForQuarter(quotes, quarter),
-    [quotes, quarter.year, quarter.quarter],
+    () =>
+      grain === "month"
+        ? commissionRowsForMonth(quotes, month)
+        : commissionRowsForQuarter(quotes, quarter),
+    [quotes, grain, month.year, month.month, quarter.year, quarter.quarter],
+  );
+  const exportRows = useMemo(
+    () => commissionRowsForQuarter(quotes, exported),
+    [quotes, exported.year, exported.quarter],
   );
   const totals = useMemo(() => commissionTotals(rows), [rows]);
+  const periodLabel =
+    grain === "month" ? monthLabel(month) : quarterLabel(quarter);
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(formatCommissionTsv(rows, quarter));
+      await navigator.clipboard.writeText(
+        formatCommissionTsv(exportRows, exported),
+      );
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -102,30 +133,72 @@ function CommissionReport({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <select
-            value={selected}
-            aria-label="Quarter"
-            className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-            onChange={(event) => setSelected(event.target.value)}
-          >
-            {quarters.map((period) => (
-              <option key={quarterKey(period)} value={quarterKey(period)}>
-                {quarterLabel(period)}
-              </option>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Month for how it is going, quarter for what gets sent. */}
+          <div className="flex rounded-md border border-slate-300 bg-white p-0.5">
+            {(
+              [
+                ["month", "Month"],
+                ["quarter", "Quarter"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={grain === value}
+                className={`min-h-9 rounded px-3 py-1.5 text-sm font-medium ${
+                  grain === value
+                    ? "bg-brand-700 text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                onClick={() => setGrain(value)}
+              >
+                {label}
+              </button>
             ))}
-          </select>
+          </div>
+          {grain === "month" ? (
+            <select
+              value={selectedMonth}
+              aria-label="Month"
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            >
+              {months.map((period) => (
+                <option key={monthKey(period)} value={monthKey(period)}>
+                  {monthLabel(period)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={selected}
+              aria-label="Quarter"
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {quarters.map((period) => (
+                <option key={quarterKey(period)} value={quarterKey(period)}>
+                  {quarterLabel(period)}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-sm text-slate-500">
             {rows.length} won deal{rows.length === 1 ? "" : "s"}
           </span>
         </div>
+        {/* Named after the quarter it emits, so it is never a surprise that a
+            month view exports the whole return. */}
         <button
           type="button"
-          disabled={rows.length === 0}
+          disabled={exportRows.length === 0}
           className="min-h-11 rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-60"
           onClick={copy}
         >
-          {copied ? "Copied — paste into Excel" : "Copy for Excel"}
+          {copied
+            ? "Copied — paste into Excel"
+            : `Copy ${quarterLabel(exported)} for Excel`}
         </button>
       </div>
 
@@ -139,7 +212,7 @@ function CommissionReport({
 
       {rows.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
-          Nothing won in {quarterLabel(quarter)} yet.
+          Nothing won in {periodLabel} yet.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
@@ -174,7 +247,7 @@ function CommissionReport({
             <tfoot>
               <tr className="border-t-2 border-slate-300 font-semibold text-slate-950">
                 <td className="px-4 py-3" colSpan={3}>
-                  Total {quarterLabel(quarter)}
+                  Total {periodLabel}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {formatMoney(totals.grossPremium)}
@@ -1193,18 +1266,20 @@ function Stat({
 // flex column sized to its content does not have.
 const CHART_BAR_AREA = 112;
 
-function QuarterChart({ quotes }: { quotes: QuoteWithClient[] }) {
-  const series = quarterlyTotals(quotes);
+// Twelve months rather than eight quarters: a run rate is what this chart is
+// for, and a quarter hides two months of it.
+function MonthChart({ quotes }: { quotes: QuoteWithClient[] }) {
+  const series = monthlyTotals(quotes);
   const peak = Math.max(...series.map((period) => period.commission), 0);
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
+    <div className="overflow-x-auto rounded-md border border-slate-200 bg-white px-4 py-4">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        Commission by quarter
+        Commission by month
       </p>
-      <div className="mt-4 flex items-end gap-3">
+      <div className="mt-4 flex min-w-[32rem] items-end gap-2">
         {series.map((period) => {
-          // A quarter with earnings always shows a bar, so a small one never
+          // A month with earnings always shows a bar, so a small one never
           // looks identical to an empty one.
           const height =
             peak > 0 && period.commission > 0
@@ -1230,7 +1305,17 @@ function QuarterChart({ quotes }: { quotes: QuoteWithClient[] }) {
                 }`}
                 style={{ height: `${height}px` }}
               />
-              <span className="text-xs text-slate-500">{period.label}</span>
+              {/* The first month of a quarter is marked, so the quarter the
+                  return is paid on can still be read off. */}
+              <span
+                className={`text-xs ${
+                  (period.month - 1) % 3 === 0
+                    ? "font-semibold text-slate-700"
+                    : "text-slate-500"
+                }`}
+              >
+                {period.label}
+              </span>
             </div>
           );
         })}
@@ -1621,7 +1706,7 @@ export function ProspectBoardPanel({
                   />
                 ) : null}
               </div>
-              <QuarterChart quotes={quotes} />
+              <MonthChart quotes={quotes} />
             </>
           ) : null}
           <ClosedList

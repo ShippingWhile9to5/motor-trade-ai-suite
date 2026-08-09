@@ -1,11 +1,13 @@
-// Won-book reporting: calendar quarters, and the totals behind the Won tab.
-// Pure logic, no I/O.
+// Won-book reporting: calendar months and quarters, and the totals behind the
+// Won tab. Pure logic, no I/O.
 
 import type { QuoteWithClient } from "./schemas/quote";
 
 export type Quarter = { year: number; quarter: 1 | 2 | 3 | 4 };
 
-export type QuarterTotals = Quarter & {
+export type Month = { year: number; month: number };
+
+export type MonthTotals = Month & {
   key: string;
   label: string;
   won: number;
@@ -57,6 +59,61 @@ export function quarterLabel({ year, quarter }: Quarter): string {
   return `Q${quarter} ${`${year}`.slice(2)}`;
 }
 
+// Commission is paid quarterly, so the return stays quarterly — but the month
+// is how the work actually feels, and nothing here could answer "how am I
+// doing this month" until now.
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+export function monthOf(dateIso: string): Month | null {
+  const match = /^(\d{4})-(\d{2})-\d{2}/.exec(dateIso);
+
+  if (!match) {
+    return null;
+  }
+
+  const month = Number(match[2]);
+
+  if (month < 1 || month > 12) {
+    return null;
+  }
+
+  return { year: Number(match[1]), month };
+}
+
+export function monthKey({ year, month }: Month): string {
+  return `${year}-${`${month}`.padStart(2, "0")}`;
+}
+
+export function monthLabel({ year, month }: Month): string {
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
+export function monthShortLabel({ year, month }: Month): string {
+  return `${MONTH_NAMES[month - 1].slice(0, 3)} ${`${year}`.slice(2)}`;
+}
+
+// The quarter a month is reported in — what the manager is sent, and so what
+// Copy for Excel emits however the table is being viewed.
+export function quarterOfMonth({ year, month }: Month): Quarter {
+  return {
+    year,
+    quarter: (Math.floor((month - 1) / 3) + 1) as Quarter["quarter"],
+  };
+}
+
 export function isWon(quote: QuoteWithClient): boolean {
   return quote.outcome === "Won";
 }
@@ -81,55 +138,51 @@ export function sumWon(quotes: QuoteWithClient[]): WonTotals {
   };
 }
 
-// Won quotes grouped into the quarter they closed in, oldest first. Quarters
-// with nothing in them are filled in so the chart has no gaps.
-// Counted from Q1 of year 0, so two quarters can be compared and subtracted.
-function quarterIndex({ year, quarter }: Quarter): number {
-  return year * 4 + (quarter - 1);
+// The same series a month at a time. Twelve months says far more about a run
+// rate than the same span as four quarters does.
+function monthIndex({ year, month }: Month): number {
+  return year * 12 + (month - 1);
 }
 
-export function quarterlyTotals(
+export function monthlyTotals(
   quotes: QuoteWithClient[],
-  maxQuarters = 8,
+  maxMonths = 12,
   today: string = todayIso(),
-): QuarterTotals[] {
-  const current = quarterOf(today);
+): MonthTotals[] {
+  const current = monthOf(today);
 
   if (!current) {
     return [];
   }
 
-  // Start at the first win, not a fixed number of quarters back — otherwise a
-  // new book shows a run of empty quarters from before it existed.
+  // Start at the first win rather than a fixed span back, so a new book does
+  // not open on a run of empty months from before it existed.
   const firstWin = quotes
     .filter((quote) => isWon(quote) && quote.closed_at)
-    .map((quote) => quarterOf(quote.closed_at as string))
-    .filter((period): period is Quarter => period !== null)
-    .reduce<Quarter | null>(
+    .map((quote) => monthOf(quote.closed_at as string))
+    .filter((period): period is Month => period !== null)
+    .reduce<Month | null>(
       (earliest, period) =>
-        !earliest || quarterIndex(period) < quarterIndex(earliest)
-          ? period
-          : earliest,
+        !earliest || monthIndex(period) < monthIndex(earliest) ? period : earliest,
       null,
     );
 
-  const span = firstWin
-    ? quarterIndex(current) - quarterIndex(firstWin) + 1
-    : 1;
-  const count = Math.min(Math.max(span, 1), maxQuarters);
+  const span = firstWin ? monthIndex(current) - monthIndex(firstWin) + 1 : 1;
+  const count = Math.min(Math.max(span, 1), maxMonths);
 
-  const buckets = new Map<string, QuarterTotals>();
-  const series: QuarterTotals[] = [];
+  const buckets = new Map<string, MonthTotals>();
+  const series: MonthTotals[] = [];
 
   for (let step = count - 1; step >= 0; step -= 1) {
-    const offset = current.quarter - 1 - step;
-    const year = current.year + Math.floor(offset / 4);
-    const quarter = (((offset % 4) + 4) % 4) + 1;
-    const bucket: QuarterTotals = {
-      year,
-      quarter: quarter as Quarter["quarter"],
-      key: quarterKey({ year, quarter: quarter as Quarter["quarter"] }),
-      label: quarterLabel({ year, quarter: quarter as Quarter["quarter"] }),
+    const offset = monthIndex(current) - step;
+    const period: Month = {
+      year: Math.floor(offset / 12),
+      month: (offset % 12) + 1,
+    };
+    const bucket: MonthTotals = {
+      ...period,
+      key: monthKey(period),
+      label: monthShortLabel(period),
       won: 0,
       premium: 0,
       commission: 0,
@@ -144,13 +197,8 @@ export function quarterlyTotals(
       continue;
     }
 
-    const period = quarterOf(quote.closed_at);
-
-    if (!period) {
-      continue;
-    }
-
-    const bucket = buckets.get(quarterKey(period));
+    const period = monthOf(quote.closed_at);
+    const bucket = period ? buckets.get(monthKey(period)) : undefined;
 
     if (!bucket) {
       continue;

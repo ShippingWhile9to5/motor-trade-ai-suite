@@ -85,87 +85,88 @@ test("the won screen counts fee income, not commission on its own", () => {
   assert.equal(totals.missingCommission, 1);
 });
 
-test("quarterly totals bucket wins by the date they closed", () => {
-  const { quarterlyTotals } = require(
+test("monthly totals bucket wins by the date they closed", () => {
+  const { monthlyTotals } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
-  const series = quarterlyTotals(
+  const series = monthlyTotals(
     [
       wonQuote({ closed_at: "2026-07-10", commission: 600, quoted_premium: 4000 }),
       wonQuote({ closed_at: "2026-07-20", commission: 400, quoted_premium: 2000 }),
-      wonQuote({ closed_at: "2026-04-05", commission: 250, quoted_premium: 1500 }),
+      wonQuote({ closed_at: "2026-05-05", commission: 250, quoted_premium: 1500 }),
     ] as never,
-    8,
+    12,
     "2026-07-25",
   );
 
   assert.deepEqual(
     series.map((period) => period.label),
-    ["Q2 26", "Q3 26"],
-    "starts at the first win, not a fixed run of quarters before the book existed",
+    ["May 26", "Jun 26", "Jul 26"],
+    "starts at the first win, not a fixed run of months before the book existed",
   );
   assert.equal(series[0].commission, 250);
-  assert.equal(series[1].commission, 1000);
-  assert.equal(series[1].won, 2);
-  assert.equal(series[1].premium, 6000);
+  assert.equal(series[1].commission, 0, "a quiet month is kept, not skipped");
+  assert.equal(series[2].commission, 1000);
+  assert.equal(series[2].won, 2);
+  assert.equal(series[2].premium, 6000);
 });
 
-test("with nothing won yet, the chart is just this quarter", () => {
-  const { quarterlyTotals } = require(
+test("with nothing won yet, the chart is just this month", () => {
+  const { monthlyTotals } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
   assert.deepEqual(
-    quarterlyTotals([], 8, "2026-07-25").map((period) => period.label),
-    ["Q3 26"],
-    "a new book should not show quarters that predate it",
+    monthlyTotals([], 12, "2026-07-25").map((period) => period.label),
+    ["Jul 26"],
+    "a new book should not show months that predate it",
   );
 });
 
-test("empty quarters between wins are kept, and the run walks across a year", () => {
-  const { quarterlyTotals } = require(
+test("the run of months walks across a year end", () => {
+  const { monthlyTotals } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
-  const series = quarterlyTotals(
+  const series = monthlyTotals(
     [
       wonQuote({ closed_at: "2025-11-10", commission: 500 }),
       wonQuote({ closed_at: "2026-02-14", commission: 700 }),
     ] as never,
-    8,
+    12,
     "2026-02-20",
   );
 
   assert.deepEqual(
     series.map((period) => period.label),
-    ["Q4 25", "Q1 26"],
+    ["Nov 25", "Dec 25", "Jan 26", "Feb 26"],
   );
   assert.equal(series[0].commission, 500);
-  assert.equal(series[1].commission, 700);
+  assert.equal(series[3].commission, 700);
 });
 
-test("a long book is capped at the most recent quarters", () => {
-  const { quarterlyTotals } = require(
+test("a long book is capped at the most recent months", () => {
+  const { monthlyTotals } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
-  const series = quarterlyTotals(
+  const series = monthlyTotals(
     [wonQuote({ closed_at: "2020-01-05", commission: 100 })] as never,
-    4,
+    12,
     "2026-07-25",
   );
 
-  assert.equal(series.length, 4, "capped rather than drawing 26 bars");
+  assert.equal(series.length, 12, "capped rather than drawing 79 bars");
   assert.equal(
     series[series.length - 1].label,
-    "Q3 26",
+    "Jul 26",
     "and it is the recent end that is kept",
   );
 });
 
 test("a win with no close date is left out of the chart but still counted", () => {
-  const { quarterlyTotals, sumWon } = require(
+  const { monthlyTotals, sumWon } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
@@ -173,7 +174,7 @@ test("a win with no close date is left out of the chart but still counted", () =
 
   assert.equal(sumWon(quotes).commission, 500);
   assert.equal(
-    quarterlyTotals(quotes, 3, "2026-07-25").reduce(
+    monthlyTotals(quotes, 3, "2026-07-25").reduce(
       (total, period) => total + period.commission,
       0,
     ),

@@ -3,7 +3,16 @@
 // replaces, so what comes out can be pasted straight back into it.
 
 import type { QuoteWithClient } from "./schemas/quote";
-import { type Quarter, formatMoney, quarterKey, quarterLabel, quarterOf } from "./reporting";
+import {
+  type Month,
+  type Quarter,
+  formatMoney,
+  monthKey,
+  monthOf,
+  quarterKey,
+  quarterLabel,
+  quarterOf,
+} from "./reporting";
 
 // The broker's share of what the company earns on a deal.
 export const BROKER_SHARE = 0.2;
@@ -60,22 +69,43 @@ export function commissionRowFor(quote: QuoteWithClient): CommissionRow {
   };
 }
 
+// Won deals whose closing date falls in the period, alphabetical, as the
+// sheet is read.
+function rowsClosedIn(
+  quotes: QuoteWithClient[],
+  matches: (closedAt: string) => boolean,
+): CommissionRow[] {
+  return quotes
+    .filter(
+      (quote) =>
+        quote.outcome === "Won" &&
+        quote.closed_at !== null &&
+        matches(quote.closed_at),
+    )
+    .map(commissionRowFor)
+    .sort((a, b) => a.policyholder.localeCompare(b.policyholder));
+}
+
 export function commissionRowsForQuarter(
   quotes: QuoteWithClient[],
   quarter: Quarter,
 ): CommissionRow[] {
-  return quotes
-    .filter((quote) => {
-      if (quote.outcome !== "Won" || !quote.closed_at) {
-        return false;
-      }
+  return rowsClosedIn(quotes, (closedAt) => {
+    const period = quarterOf(closedAt);
 
-      const period = quarterOf(quote.closed_at);
+    return period !== null && quarterKey(period) === quarterKey(quarter);
+  });
+}
 
-      return period !== null && quarterKey(period) === quarterKey(quarter);
-    })
-    .map(commissionRowFor)
-    .sort((a, b) => a.policyholder.localeCompare(b.policyholder));
+export function commissionRowsForMonth(
+  quotes: QuoteWithClient[],
+  month: Month,
+): CommissionRow[] {
+  return rowsClosedIn(quotes, (closedAt) => {
+    const period = monthOf(closedAt);
+
+    return period !== null && monthKey(period) === monthKey(month);
+  });
 }
 
 export function commissionTotals(rows: CommissionRow[]): CommissionTotals {
@@ -118,6 +148,30 @@ export function quartersWithWins(
   return [...seen.values()].sort((a, b) =>
     quarterKey(b).localeCompare(quarterKey(a)),
   );
+}
+
+// The same list a month at a time, for the view the broker tracks himself on.
+export function monthsWithWins(
+  quotes: QuoteWithClient[],
+  current: Month,
+): Month[] {
+  const seen = new Map<string, Month>();
+
+  seen.set(monthKey(current), current);
+
+  for (const quote of quotes) {
+    if (quote.outcome !== "Won" || !quote.closed_at) {
+      continue;
+    }
+
+    const period = monthOf(quote.closed_at);
+
+    if (period) {
+      seen.set(monthKey(period), period);
+    }
+  }
+
+  return [...seen.values()].sort((a, b) => monthKey(b).localeCompare(monthKey(a)));
 }
 
 function money(value: number | null): string {

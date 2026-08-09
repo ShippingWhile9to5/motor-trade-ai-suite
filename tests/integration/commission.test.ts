@@ -208,3 +208,68 @@ test("the quarter list offers this quarter plus any that have wins", () => {
     "newest first, and a lost deal opens no quarter",
   );
 });
+
+test("a month shows only that month's wins", () => {
+  const { commissionRowsForMonth } = require(
+    "../../lib/commission",
+  ) as typeof import("../../lib/commission");
+
+  const rows = commissionRowsForMonth(
+    [
+      won({ id: "a", client_name: "In the month", closed_at: "2026-07-10" }),
+      won({ id: "b", client_name: "Same quarter, other month", closed_at: "2026-08-02" }),
+      won({ id: "c", client_name: "Last quarter", closed_at: "2026-04-10" }),
+      won({ id: "d", client_name: "Lost", outcome: "Lost", closed_at: "2026-07-11" }),
+    ] as never,
+    { year: 2026, month: 7 },
+  );
+
+  assert.deepEqual(rows.map((row) => row.policyholder), ["In the month"]);
+});
+
+test("the month a deal is reported in is the quarter it is paid in", () => {
+  const { commissionRowsForQuarter, commissionRowsForMonth } = require(
+    "../../lib/commission",
+  ) as typeof import("../../lib/commission");
+  const { quarterOfMonth } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const quotes = [
+    won({ id: "a", client_name: "July", closed_at: "2026-07-10" }),
+    won({ id: "b", client_name: "August", closed_at: "2026-08-02" }),
+    won({ id: "c", client_name: "September", closed_at: "2026-09-30" }),
+  ] as never;
+
+  const august = { year: 2026, month: 8 } as const;
+
+  assert.deepEqual(quarterOfMonth(august), { year: 2026, quarter: 3 });
+  assert.equal(commissionRowsForMonth(quotes, august).length, 1);
+  assert.equal(
+    commissionRowsForQuarter(quotes, quarterOfMonth(august)).length,
+    3,
+    "so viewing August still exports the whole of Q3 to the manager",
+  );
+});
+
+test("the month list offers this month plus any that have wins", () => {
+  const { monthsWithWins } = require(
+    "../../lib/commission",
+  ) as typeof import("../../lib/commission");
+
+  const months = monthsWithWins(
+    [
+      won({ id: "a", closed_at: "2026-07-10" }),
+      won({ id: "b", closed_at: "2025-11-02" }),
+      won({ id: "c", closed_at: "2026-08-01" }),
+      won({ id: "d", outcome: "Lost", closed_at: "2024-01-01" }),
+    ] as never,
+    { year: 2026, month: 8 },
+  );
+
+  assert.deepEqual(
+    months.map((period) => `${period.year}-${period.month}`),
+    ["2026-8", "2026-7", "2025-11"],
+    "newest first, and a lost deal opens no month",
+  );
+});
