@@ -66,6 +66,25 @@ test("won totals count only won quotes and flag missing commission", () => {
   assert.equal(totals.missingCommission, 1, "so the total is not silently short");
 });
 
+test("the won screen counts fee income, not commission on its own", () => {
+  const { sumWon } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  // The figure the Won tab shows has to agree with the commission return,
+  // which pays on commission plus fee.
+  const totals = sumWon([
+    wonQuote({ commission: 630.75, fee: 50 }),
+    wonQuote({ commission: 870, fee: null }),
+    wonQuote({ commission: null, fee: 25 }),
+  ] as never);
+
+  assert.equal(totals.commission, 1500.75);
+  assert.equal(totals.fee, 75);
+  assert.equal(totals.totalIncome, 1575.75);
+  assert.equal(totals.missingCommission, 1);
+});
+
 test("quarterly totals bucket wins by the date they closed", () => {
   const { quarterlyTotals } = require(
     "../../lib/reporting",

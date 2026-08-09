@@ -66,9 +66,11 @@ type BoardTab = "pipeline" | "won" | "lost" | "commission";
 function CommissionReport({
   quotes,
   onChanged,
+  openOn,
 }: {
   quotes: QuoteWithClient[];
   onChanged: () => void;
+  openOn?: string | null;
 }) {
   const today = todayIso();
   const current = quarterOf(today) ?? { year: 2026, quarter: 1 as const };
@@ -76,7 +78,7 @@ function CommissionReport({
     () => quartersWithWins(quotes, current),
     [quotes, current.year, current.quarter],
   );
-  const [selected, setSelected] = useState(quarterKey(current));
+  const [selected, setSelected] = useState(openOn ?? quarterKey(current));
   const [copied, setCopied] = useState(false);
 
   const quarter =
@@ -1242,11 +1244,13 @@ function ClosedRow({
   quotes,
   outcomeLabel,
   onChanged,
+  onAddIncome,
 }: {
   business: Business;
   quotes: QuoteWithClient[];
   outcomeLabel: "Won" | "Lost";
   onChanged: () => void;
+  onAddIncome: (quote: QuoteWithClient) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -1256,13 +1260,10 @@ function ClosedRow({
   const quoteCount = quotes.filter(
     (row) => row.business_id === business.id,
   ).length;
-  // Editable here as well as on the Quote Tracker: this is the tab you are
-  // looking at when you reconcile the figures, so it is where you fix them.
+  // The premium belongs to the quote, so it stays editable here. Income
+  // belongs to the return, and is entered on the Commission tab.
   const [premium, setPremium] = useState(
     quote?.quoted_premium == null ? "" : String(quote.quoted_premium),
-  );
-  const [commission, setCommission] = useState(
-    quote?.commission == null ? "" : String(quote.commission),
   );
 
   function saveQuote(changes: Record<string, unknown>) {
@@ -1321,32 +1322,30 @@ function ClosedRow({
           "—"
         )}
       </td>
+      {/* Income is read here and entered on the Commission tab. Two screens
+          taking the same figures is how this one came to show commission
+          without the fee against it. */}
       {outcomeLabel === "Won" ? (
-        <td className="px-4 py-3">
-          {quote ? (
-            <input
-              type="number"
-              value={commission}
-              placeholder="0.00"
-              disabled={isPending}
-              aria-label={`Commission for ${business.name}`}
-              className={`min-h-9 w-28 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
-                quote.commission == null
-                  ? "border-amber-400"
-                  : "border-slate-300"
-              }`}
-              onChange={(event) => setCommission(event.target.value)}
-              onBlur={() => {
-                const current =
-                  quote.commission == null ? "" : String(quote.commission);
-
-                if (commission.trim() !== current) {
-                  saveQuote({ commission });
-                }
-              }}
-            />
+        <td className="px-4 py-3 text-right">
+          {quote == null ? (
+            <span className="text-slate-500">—</span>
+          ) : quote.commission == null ? (
+            <button
+              type="button"
+              className="min-h-9 rounded-md border border-amber-400 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+              onClick={() => onAddIncome(quote)}
+            >
+              Add the income →
+            </button>
           ) : (
-            "—"
+            <button
+              type="button"
+              className="text-sm text-slate-950 underline decoration-slate-300 underline-offset-4 hover:decoration-slate-600"
+              title={`Commission ${formatMoney(quote.commission)} + fee ${formatMoney(quote.fee ?? 0)} — edit on the Commission tab`}
+              onClick={() => onAddIncome(quote)}
+            >
+              {formatMoney(quote.commission + (quote.fee ?? 0))}
+            </button>
           )}
         </td>
       ) : null}
@@ -1378,11 +1377,13 @@ function ClosedList({
   quotes,
   outcomeLabel,
   onChanged,
+  onAddIncome,
 }: {
   businesses: Business[];
   quotes: QuoteWithClient[];
   outcomeLabel: "Won" | "Lost";
   onChanged: () => void;
+  onAddIncome: (quote: QuoteWithClient) => void;
 }) {
   if (businesses.length === 0) {
     return (
@@ -1401,7 +1402,7 @@ function ClosedList({
             <th className="px-4 py-3 font-medium">Insurer</th>
             <th className="px-4 py-3 font-medium">Premium</th>
             {outcomeLabel === "Won" ? (
-              <th className="px-4 py-3 font-medium">Commission</th>
+              <th className="px-4 py-3 text-right font-medium">Total income</th>
             ) : null}
             <th className="px-4 py-3 font-medium">
               {outcomeLabel === "Won" ? "Won" : "Closed"}
@@ -1421,6 +1422,7 @@ function ClosedList({
               quotes={quotes}
               outcomeLabel={outcomeLabel}
               onChanged={onChanged}
+              onAddIncome={onAddIncome}
             />
           ))}
         </tbody>
@@ -1447,9 +1449,19 @@ export function ProspectBoardPanel({
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Set when arriving at the return from a won deal, so it opens on that
+  // deal's quarter instead of leaving you to find it.
+  const [incomeQuarter, setIncomeQuarter] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => router.refresh());
+  }
+
+  function showIncomeFor(quote: QuoteWithClient) {
+    const period = quote.closed_at ? quarterOf(quote.closed_at) : null;
+
+    setIncomeQuarter(period ? quarterKey(period) : null);
+    setTab("commission");
   }
 
   function changeView(next: BoardView) {
@@ -1567,7 +1579,12 @@ export function ProspectBoardPanel({
                 ? "border-brand-700 text-brand-800"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
-            onClick={() => setTab(value)}
+            onClick={() => {
+              // Picking the tab yourself means the current quarter, not
+              // whichever one a won deal last sent you to.
+              setIncomeQuarter(null);
+              setTab(value);
+            }}
           >
             {label}
           </button>
@@ -1575,7 +1592,14 @@ export function ProspectBoardPanel({
       </div>
 
       {tab === "commission" ? (
-        <CommissionReport quotes={quotes} onChanged={refresh} />
+        // Remounted when arriving from a won deal, so the report opens on the
+        // quarter that deal closed in rather than whatever was last chosen.
+        <CommissionReport
+          key={incomeQuarter ?? "current"}
+          quotes={quotes}
+          openOn={incomeQuarter}
+          onChanged={refresh}
+        />
       ) : null}
 
       {tab === "won" || tab === "lost" ? (
@@ -1586,8 +1610,8 @@ export function ProspectBoardPanel({
                 <Stat label="Deals won" value={`${wonTotals.won}`} />
                 <Stat label="Premium" value={formatMoney(wonTotals.premium)} />
                 <Stat
-                  label="Commission"
-                  value={formatMoney(wonTotals.commission)}
+                  label="Total income"
+                  value={formatMoney(wonTotals.totalIncome)}
                 />
                 {wonTotals.missingCommission > 0 ? (
                   <Stat
@@ -1605,6 +1629,7 @@ export function ProspectBoardPanel({
             quotes={quotes}
             outcomeLabel={tab === "won" ? "Won" : "Lost"}
             onChanged={refresh}
+            onAddIncome={showIncomeFor}
           />
         </>
       ) : null}

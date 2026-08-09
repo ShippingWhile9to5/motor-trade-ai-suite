@@ -526,7 +526,15 @@ test("placing the risk with one insurer closes the rest as NTU", async () => {
   assert.equal(byId.get(nig.id)?.outcome, "Won");
   assert.equal(byId.get(covea.id)?.outcome, "NTU", "closed on its own");
   assert.equal(byId.get(covea.id)?.stage, 6, "and off the live board");
-  assert.equal(byId.get(covea.id)?.closed_at, "2026-07-31");
+  const { todayIso } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  assert.equal(
+    byId.get(covea.id)?.closed_at,
+    todayIso(),
+    "dated the day the risk was placed, like the winner",
+  );
   assert.equal(
     byId.get(jensten.id)?.outcome,
     "Lost",

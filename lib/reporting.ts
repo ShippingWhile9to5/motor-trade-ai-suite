@@ -17,6 +17,8 @@ export type WonTotals = {
   won: number;
   premium: number;
   commission: number;
+  fee: number;
+  totalIncome: number;
   missingCommission: number;
 };
 
@@ -66,6 +68,13 @@ export function sumWon(quotes: QuoteWithClient[]): WonTotals {
     won: won.length,
     premium: won.reduce((total, quote) => total + (quote.quoted_premium ?? 0), 0),
     commission: won.reduce((total, quote) => total + (quote.commission ?? 0), 0),
+    fee: won.reduce((total, quote) => total + (quote.fee ?? 0), 0),
+    // What the work actually earned, and the figure the return pays on:
+    // commission alone understates it by every fee charged.
+    totalIncome: won.reduce(
+      (total, quote) => total + (quote.commission ?? 0) + (quote.fee ?? 0),
+      0,
+    ),
     // Manual commission entry means a figure can simply be missed. Counting
     // them keeps the totals honest rather than quietly understated.
     missingCommission: won.filter((quote) => quote.commission == null).length,
