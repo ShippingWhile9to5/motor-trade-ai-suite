@@ -128,6 +128,17 @@ export const updateQuoteInputSchema = z.object({
   fee: optionalPremiumField,
   policy_type: z.string().trim().nullable().optional(),
   outcome: quoteOutcomeSchema.nullable().optional(),
+  // The date the deal counts as won, which is not always the day it was
+  // ticked: a win on the 30th recorded on the 1st belongs in the quarter it
+  // was won in, or the return goes out short.
+  closed_at: z
+    .union([
+      z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-09-30."),
+      z.literal(""),
+      z.null(),
+    ])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value || null)),
 });
 
 export const deleteQuoteInputSchema = z.object({

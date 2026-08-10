@@ -143,7 +143,13 @@ export async function updateQuoteWorkflow(
 
   // Date the win the day it happens, so quarterly totals stay put even if the
   // stage is moved afterwards. Clearing the outcome clears the date with it.
-  if (changes.outcome !== undefined && changes.outcome !== existing.outcome) {
+  // A date given by hand always wins: a deal is often marked days after it was
+  // actually won, and if that crosses a quarter end the return goes out short.
+  if (
+    changes.closed_at === undefined &&
+    changes.outcome !== undefined &&
+    changes.outcome !== existing.outcome
+  ) {
     patch.closed_at = changes.outcome === null ? null : todayIso();
   }
 

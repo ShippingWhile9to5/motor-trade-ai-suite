@@ -1434,7 +1434,24 @@ function ClosedRow({
           )}
         </td>
       ) : null}
-      <td className="px-4 py-3 text-slate-500">{quote?.closed_at ?? "—"}</td>
+      {/* Editable, because the day a deal is ticked is rarely the day it was
+          won — and if that gap crosses a quarter end, the return is wrong. */}
+      <td className="px-4 py-3 text-slate-500">
+        {quote ? (
+          <input
+            type="date"
+            value={quote.closed_at ?? ""}
+            disabled={isPending}
+            aria-label={`${outcomeLabel === "Won" ? "Won" : "Closed"} on, for ${business.name}`}
+            className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-950"
+            onChange={(event) =>
+              saveQuote({ closed_at: event.target.value })
+            }
+          />
+        ) : (
+          "—"
+        )}
+      </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2">
           {/* A won client comes round again at renewal, and that is a new

@@ -640,3 +640,122 @@ test("cards group by submission, so a client is one line per stage", () => {
     ["NIG", "Covea"],
   );
 });
+
+test("a win can be dated the day it was won, not the day it was ticked", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+  const { todayIso } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-09-01",
+  });
+
+  // Won on the 30th, sat down and marked it on the 1st. Without the date it
+  // would land in Q4 and leave the Q3 return short.
+  const won = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    outcome: "Won",
+    closed_at: "2026-09-30",
+  });
+
+  assert.equal(won?.closed_at, "2026-09-30");
+  assert.notEqual(won?.closed_at, todayIso());
+  assert.equal(won?.outcome, "Won");
+  assert.equal(won?.stage, 6, "and it still closes itself");
+});
+
+test("with no date given, a win is still stamped today", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+  const { todayIso } = require(
+    "../../lib/reporting",
+  ) as typeof import("../../lib/reporting");
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-09-01",
+  });
+
+  const won = await updateQuoteWorkflow(USER, { id: quote.id, outcome: "Won" });
+
+  assert.equal(won?.closed_at, todayIso(), "the everyday case is unchanged");
+});
+
+test("the date can be corrected afterwards without reopening the deal", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-09-01",
+    quoted_premium: "4200",
+  });
+
+  await updateQuoteWorkflow(USER, { id: quote.id, outcome: "Won" });
+
+  const corrected = await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    closed_at: "2026-09-30",
+  });
+
+  assert.equal(corrected?.closed_at, "2026-09-30");
+  assert.equal(corrected?.outcome, "Won", "the outcome is left alone");
+  assert.equal(corrected?.quoted_premium, 4200);
+});
+
+test("a corrected date moves the deal into the right return", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+  const { commissionRowsForQuarter } = require(
+    "../../lib/commission",
+  ) as typeof import("../../lib/commission");
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-09-01",
+    quoted_premium: "4200",
+  });
+
+  await updateQuoteWorkflow(USER, {
+    id: quote.id,
+    outcome: "Won",
+    closed_at: "2026-09-30",
+  });
+
+  const all = await listQuotesWithClientsWorkflow(USER);
+
+  assert.equal(
+    commissionRowsForQuarter(all, { year: 2026, quarter: 3 }).length,
+    1,
+    "counted in the quarter it was won in",
+  );
+  assert.equal(
+    commissionRowsForQuarter(all, { year: 2026, quarter: 4 }).length,
+    0,
+    "not the one it was typed in",
+  );
+});
+
+test("a date that is not a date is refused", async () => {
+  resetStore();
+  const { createQuoteWorkflow, updateQuoteWorkflow } = loadServices();
+
+  const quote = await createQuoteWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurer: "Covea",
+    submission_date: "2026-09-01",
+  });
+
+  await assert.rejects(
+    () => updateQuoteWorkflow(USER, { id: quote.id, closed_at: "30/09/2026" }),
+    /date like/,
+  );
+});
