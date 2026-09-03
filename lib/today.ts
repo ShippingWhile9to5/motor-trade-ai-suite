@@ -80,6 +80,7 @@ export function buildTodayList(
       !business.follow_up ||
       business.pipeline_status === "won" ||
       business.pipeline_status === "lost" ||
+      business.pipeline_status === "not_interested" ||
       beingQuoted.has(business.id) ||
       !isDueOrOverdue(business.follow_up, today)
     ) {

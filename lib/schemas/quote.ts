@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const quoteOutcomeSchema = z.enum(["Won", "Lost", "NTU"]);
+// Four distinct endings, because they mean four different things. Won and
+// Lost settle the whole case; NTU is one insurer's quote not taken up, and
+// Declined is an insurer who would not quote at all — neither of which says
+// anything about the insurers still looking at the risk.
+export const quoteOutcomeSchema = z.enum(["Won", "Lost", "NTU", "Declined"]);
 
 export const quoteSchema = z.object({
   id: z.string().uuid(),
@@ -25,6 +29,11 @@ export const quoteSchema = z.object({
   // be typed rather than blocking the export on a list being complete.
   policy_type: z.string().nullable().default(null),
   fee: z.number().nullable().default(null),
+  // Why the case was lost. A short list so it can be counted — nine losses on
+  // price is an argument for a rate change, nine paragraphs is not — with a
+  // note for the detail a list never holds.
+  lost_reason: z.string().nullable().default(null),
+  lost_note: z.string().nullable().default(null),
   // The day the policy incepted, typed in once the deal is placed. The
   // renewal is twelve months after it, worked out rather than stored.
   cover_start: z.string().nullable().default(null),
@@ -147,6 +156,8 @@ export const updateQuoteInputSchema = z.object({
   // was won in, or the return goes out short.
   closed_at: dateField,
   cover_start: dateField,
+  lost_reason: z.string().trim().nullable().optional(),
+  lost_note: z.string().trim().nullable().optional(),
 });
 
 export const deleteQuoteInputSchema = z.object({

@@ -11,6 +11,7 @@ export const PIPELINE_STATUSES: BusinessPipelineStatus[] = [
   "quoting",
   "won",
   "lost",
+  "not_interested",
 ];
 
 export const PIPELINE_STATUS_LABELS: Record<BusinessPipelineStatus, string> = {
@@ -19,10 +20,17 @@ export const PIPELINE_STATUS_LABELS: Record<BusinessPipelineStatus, string> = {
   quoting: "Quoting",
   won: "Won",
   lost: "Lost",
+  not_interested: "Not interested",
 };
 
 // A closed business is off the follow-up radar: no overdue or due-today flag.
-const CLOSED_STATUSES: BusinessPipelineStatus[] = ["won", "lost"];
+// A firm that has said no belongs here too — it is finished with, even though
+// it is not a case that was lost.
+const CLOSED_STATUSES: BusinessPipelineStatus[] = [
+  "won",
+  "lost",
+  "not_interested",
+];
 
 // The standalone board carried eight statuses. The suite runs on the five-stage
 // spine shared with the Quote Tracker, so the finer prospecting states collapse

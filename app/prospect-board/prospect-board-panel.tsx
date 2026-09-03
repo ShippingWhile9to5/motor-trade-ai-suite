@@ -27,6 +27,7 @@ import {
   sortBusinesses,
   todayIso,
 } from "../../lib/prospect-board";
+import { LOST_REASONS } from "../../lib/quote-tracker";
 import type {
   Business,
   BusinessPipelineStatus,
@@ -407,6 +408,7 @@ function CommissionRowView({
 }
 
 const statusPill: Record<BusinessPipelineStatus, string> = {
+  not_interested: "bg-slate-200 text-slate-500",
   prospect: "bg-slate-100 text-slate-600",
   contacted: "bg-blue-100 text-blue-700",
   quoting: "bg-amber-100 text-amber-800",
@@ -1335,12 +1337,14 @@ function ClosedRow({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const quote = quotes.find(
-    (row) => row.business_id === business.id && row.outcome === outcomeLabel,
-  );
-  const quoteCount = quotes.filter(
-    (row) => row.business_id === business.id,
-  ).length;
+  // The quote this row reports on. A lost case can also carry NTU and Declined
+  // cards against the same firm, so the one matching the tab is preferred and
+  // any closed one will do rather than showing a dash.
+  const forBusiness = quotes.filter((row) => row.business_id === business.id);
+  const quote =
+    forBusiness.find((row) => row.outcome === outcomeLabel) ??
+    forBusiness.find((row) => row.outcome !== null);
+  const quoteCount = forBusiness.length;
   // The premium belongs to the quote, so it stays editable here. Income
   // belongs to the return, and is entered on the Commission tab.
   const [premium, setPremium] = useState(
@@ -1377,6 +1381,15 @@ function ClosedRow({
     <tr className="border-b border-slate-100 last:border-0">
       <td className="px-4 py-3 font-medium text-slate-950">
         {business.name}
+        {/* The tab holds both lost cases and firms that said no, so the row
+            has to say which — they are not the same thing. */}
+        {business.pipeline_status === "not_interested" ? (
+          <span
+            className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${statusPill.not_interested}`}
+          >
+            Not interested
+          </span>
+        ) : null}
         {error ? <p className="text-xs text-red-600">{error}</p> : null}
       </td>
       <td className="px-4 py-3 text-slate-600">{quote?.insurer ?? "—"}</td>
@@ -1427,6 +1440,53 @@ function ClosedRow({
             >
               {formatMoney(quote.commission + (quote.fee ?? 0))}
             </button>
+          )}
+        </td>
+      ) : null}
+      {/* Countable, so "nine on price this quarter" is an argument a manager
+          can act on, with a note for what the list cannot hold. */}
+      {outcomeLabel === "Lost" ? (
+        <td className="px-4 py-3">
+          {quote ? (
+            <div className="flex flex-col gap-1">
+              <select
+                value={quote.lost_reason ?? ""}
+                disabled={isPending}
+                aria-label={`Why ${business.name} was lost`}
+                className={`min-h-9 w-44 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
+                  quote.lost_reason == null
+                    ? "border-amber-400"
+                    : "border-slate-300"
+                }`}
+                onChange={(event) =>
+                  saveQuote({ lost_reason: event.target.value })
+                }
+              >
+                <option value="">Not recorded</option>
+                {LOST_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {reason}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                defaultValue={quote.lost_note ?? ""}
+                placeholder="Note (optional)"
+                disabled={isPending}
+                aria-label={`Note on losing ${business.name}`}
+                className="min-h-9 w-44 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-950"
+                onBlur={(event) => {
+                  const next = event.target.value.trim();
+
+                  if (next !== (quote.lost_note ?? "")) {
+                    saveQuote({ lost_note: next });
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            "—"
           )}
         </td>
       ) : null}
@@ -1528,6 +1588,9 @@ function ClosedList({
             {outcomeLabel === "Won" ? (
               <th className="px-4 py-3 font-medium">On cover</th>
             ) : null}
+            {outcomeLabel === "Lost" ? (
+              <th className="px-4 py-3 font-medium">Why lost</th>
+            ) : null}
             <th className="px-4 py-3 font-medium">
               {outcomeLabel === "Won" ? "Won" : "Closed"}
             </th>
@@ -1559,7 +1622,7 @@ function ClosedList({
 // wide enough to include it, with its card already open.
 function tabForStatus(status: BusinessPipelineStatus): BoardTab {
   if (status === "won") return "won";
-  if (status === "lost") return "lost";
+  if (status === "lost" || status === "not_interested") return "lost";
 
   return "pipeline";
 }
@@ -1620,14 +1683,22 @@ export function ProspectBoardPanel({
       businesses.filter(
         (business) =>
           business.pipeline_status !== "won" &&
-          business.pipeline_status !== "lost",
+          business.pipeline_status !== "lost" &&
+          business.pipeline_status !== "not_interested",
       ),
     [businesses],
   );
   const closed = useMemo(
     () => ({
       won: businesses.filter((business) => business.pipeline_status === "won"),
-      lost: businesses.filter((business) => business.pipeline_status === "lost"),
+      // Firms that said no share the tab with lost cases — both are finished
+      // with — but keep their own status, so nothing counts a firm you never
+      // quoted for as a case you lost.
+      lost: businesses.filter(
+        (business) =>
+          business.pipeline_status === "lost" ||
+          business.pipeline_status === "not_interested",
+      ),
     }),
     [businesses],
   );
@@ -1710,7 +1781,7 @@ export function ProspectBoardPanel({
           [
             ["pipeline", `Pipeline (${live.length})`],
             ["won", `Won (${closed.won.length})`],
-            ["lost", `Lost (${closed.lost.length})`],
+            ["lost", `Lost / not interested (${closed.lost.length})`],
             ["commission", "Commission"],
           ] as const
         ).map(([value, label]) => (

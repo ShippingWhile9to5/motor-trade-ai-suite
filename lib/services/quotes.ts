@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   type Quote,
+  type QuoteOutcome,
   type QuoteWithClient,
   createQuoteInputSchema,
   createQuotesInputSchema,
@@ -166,24 +167,26 @@ export async function updateQuoteWorkflow(
     return null;
   }
 
-  // A won/lost outcome flips the shared client record to match, so the
-  // dashboard's "won clients" reflects it without re-entry.
+  // Won and Lost settle the whole submission, so the rest of it closes with
+  // them rather than being ticked off one insurer at a time.
   if (changes.outcome === "Won") {
-    // Placing the risk with one insurer settles the whole submission: the
-    // others are not taken up, and should stop sitting on the board asking to
-    // be chased.
-    await closeSiblingQuotes(userId, updated);
+    await closeSiblingQuotes(userId, updated, "NTU");
     await updateBusinessPipelineStatus(userId, updated.business_id, "won");
-  } else if (changes.outcome === "Lost" || changes.outcome === "NTU") {
-    // But a loser closing must never demote a client whose business was won
-    // on another insurer's quote — otherwise settling a submission would mark
-    // the firm lost a moment after marking it won.
-    const stillWon = await hasWonQuote(userId, updated.business_id);
-
-    if (!stillWon) {
-      await updateBusinessPipelineStatus(userId, updated.business_id, "lost");
-    }
+  } else if (changes.outcome === "Lost") {
+    // The case is lost, so the others are lost with it — and they inherit the
+    // reason, because there is one reason for one case.
+    await closeSiblingQuotes(userId, updated, "Lost", {
+      lost_reason: updated.lost_reason,
+      lost_note: updated.lost_note,
+    });
+    await demoteIfNothingWon(userId, updated.business_id);
+  } else if (changes.outcome === "NTU") {
+    await demoteIfNothingWon(userId, updated.business_id);
   }
+
+  // Declined is deliberately absent from all of that. One insurer refusing to
+  // quote says nothing about the ones still looking at the risk, so it closes
+  // its own card and leaves both the siblings and the client alone.
 
   const business = await getBusinessById(userId, updated.business_id);
 
@@ -194,15 +197,19 @@ export async function updateQuoteWorkflow(
 // on the same day, that are still waiting on an answer.
 async function closeSiblingQuotes(
   userId: string,
-  winner: Quote,
+  settled: Quote,
+  outcome: QuoteOutcome,
+  extra: Record<string, unknown> = {},
 ): Promise<void> {
-  const siblings = await listQuotesForBusiness(userId, winner.business_id);
-  const closedAt = todayIso();
+  const siblings = await listQuotesForBusiness(userId, settled.business_id);
+  // Dated to match the quote that settled them, so a whole submission lands in
+  // one period on the return rather than being split by when it was typed.
+  const closedAt = settled.closed_at ?? todayIso();
 
   for (const sibling of siblings) {
     const sameSubmission =
-      sibling.id !== winner.id &&
-      sibling.submission_date === winner.submission_date &&
+      sibling.id !== settled.id &&
+      sibling.submission_date === settled.submission_date &&
       sibling.outcome === null;
 
     if (!sameSubmission) {
@@ -212,7 +219,8 @@ async function closeSiblingQuotes(
     // Written straight to the row rather than back through this workflow, so
     // closing them cannot cascade into another round of status changes.
     await updateQuoteRow(userId, sibling.id, {
-      outcome: "NTU",
+      ...extra,
+      outcome,
       stage: CLOSED_STAGE,
       closed_at: closedAt,
       stage_entered_at: new Date().toISOString(),
@@ -220,13 +228,20 @@ async function closeSiblingQuotes(
   }
 }
 
-async function hasWonQuote(
+// A loser closing must never demote a client whose business was won on another
+// insurer's quote — otherwise settling a submission would mark the firm lost a
+// moment after marking it won.
+async function demoteIfNothingWon(
   userId: string,
   businessId: string,
-): Promise<boolean> {
+): Promise<void> {
   const quotes = await listQuotesForBusiness(userId, businessId);
 
-  return quotes.some((quote) => quote.outcome === "Won");
+  if (quotes.some((quote) => quote.outcome === "Won")) {
+    return;
+  }
+
+  await updateBusinessPipelineStatus(userId, businessId, "lost");
 }
 
 export async function deleteQuoteWorkflow(

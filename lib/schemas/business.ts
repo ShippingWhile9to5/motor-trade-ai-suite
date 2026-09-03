@@ -1,11 +1,15 @@
 import { z } from "zod";
 
+// "not_interested" is deliberately not "lost": a firm that never wanted a
+// quote is not a case you quoted for and lost, and mixing them makes both the
+// Lost tab and any conversion figure meaningless.
 export const businessPipelineStatusSchema = z.enum([
   "prospect",
   "contacted",
   "quoting",
   "won",
   "lost",
+  "not_interested",
 ]);
 
 export const businessSourceSchema = z.enum(["manual", "finder", "import"]);

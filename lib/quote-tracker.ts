@@ -153,3 +153,14 @@ export function groupBySubmission<T extends Groupable>(
 
   return groups;
 }
+
+// Why a case was lost, as a list rather than free text: a manager asking why
+// the book is not converting wants a count, and free text cannot be counted.
+export const LOST_REASONS = [
+  "Price",
+  "Cover",
+  "Stayed with incumbent",
+  "No reply",
+  "Not proceeding",
+  "Other",
+] as const;

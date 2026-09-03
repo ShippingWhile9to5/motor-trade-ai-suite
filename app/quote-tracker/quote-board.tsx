@@ -42,7 +42,15 @@ const NEW_CLIENT = "__new__";
 // Same idea for the product: the list covers the book, not every cover there is.
 const OTHER_POLICY = "__other_policy__";
 
-const OUTCOMES: QuoteOutcome[] = ["Won", "Lost", "NTU"];
+// Ordered as they happen: the case settles, or one insurer drops out of it.
+const OUTCOMES: QuoteOutcome[] = ["Won", "Lost", "NTU", "Declined"];
+
+const OUTCOME_HINT: Record<QuoteOutcome, string> = {
+  Won: "Placed with this insurer — the rest of the submission closes as NTU",
+  Lost: "The case is lost — the rest of the submission closes with it",
+  NTU: "Quoted, not taken up — this insurer only",
+  Declined: "This insurer would not quote — the others carry on",
+};
 
 function todayIso(): string {
   const now = new Date();
@@ -375,6 +383,7 @@ const outcomeBadge: Record<QuoteOutcome, string> = {
   Won: "bg-emerald-100 text-emerald-700",
   Lost: "bg-slate-200 text-slate-600",
   NTU: "bg-slate-200 text-slate-600",
+  Declined: "bg-slate-200 text-slate-600",
 };
 
 // The typed-in fields, held as a draft so several can be corrected in one
@@ -627,6 +636,11 @@ function QuoteCard({
               </option>
             ))}
           </select>
+          {quote.outcome ? (
+            <p className="mt-1 text-xs text-slate-500">
+              {OUTCOME_HINT[quote.outcome]}
+            </p>
+          ) : null}
 
           {/* Armed first: a quote carries its premium history and commission,
               and there is no undo. */}

@@ -792,3 +792,67 @@ test("search matches name, town and director; sort puts undated last", () => {
     "records with no follow-up sink to the bottom",
   );
 });
+
+test("a firm that says no is not a case you lost", async () => {
+  resetStore();
+  const { createBusinessWorkflow, updateBusinessWorkflow, listBusinessesWorkflow } =
+    require("../../lib/services/businesses") as typeof import("../../lib/services/businesses");
+  const { filterByView } = require(
+    "../../lib/prospect-board",
+  ) as typeof import("../../lib/prospect-board");
+
+  const firm = await createBusinessWorkflow(USER, {
+    name: "Not Interested Motors Ltd",
+    pipeline_status: "contacted",
+  });
+
+  const updated = await updateBusinessWorkflow(USER, {
+    id: firm.id,
+    pipeline_status: "not_interested",
+  });
+
+  assert.equal(updated?.pipeline_status, "not_interested");
+
+  // Off the calling list, without pretending a quote ever went out.
+  const all = await listBusinessesWorkflow(USER);
+  const live = all.filter(
+    (business) =>
+      business.pipeline_status !== "won" &&
+      business.pipeline_status !== "lost" &&
+      business.pipeline_status !== "not_interested",
+  );
+
+  assert.equal(live.length, 0);
+  assert.equal(
+    filterByView(all, "all", "2026-09-03").some(
+      (business) => business.id === firm.id,
+    ),
+    true,
+    "still findable, just not in the queue",
+  );
+});
+
+test("a firm that says no keeps its call-back out of Today", () => {
+  const { buildTodayList } = require(
+    "../../lib/today",
+  ) as typeof import("../../lib/today");
+
+  const items = buildTodayList(
+    {
+      reminders: [] as never,
+      businesses: [
+        {
+          id: "b1",
+          user_id: USER,
+          name: "Not Interested Motors Ltd",
+          pipeline_status: "not_interested",
+          follow_up: "2026-07-20",
+        },
+      ] as never,
+      quotes: [] as never,
+    },
+    "2026-07-26",
+  );
+
+  assert.deepEqual(items, [], "they have said no; stop ringing them");
+});

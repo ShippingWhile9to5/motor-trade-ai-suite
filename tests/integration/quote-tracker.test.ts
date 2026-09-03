@@ -516,8 +516,8 @@ test("placing the risk with one insurer closes the rest as NTU", async () => {
     submission_date: "2026-07-24",
   });
 
-  // One insurer has already declined by hand before the winner is picked.
-  await updateQuoteWorkflow(USER, { id: jensten.id, outcome: "Lost" });
+  // One insurer has already declined to quote before the winner is picked.
+  await updateQuoteWorkflow(USER, { id: jensten.id, outcome: "Declined" });
   await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Won" });
 
   const all = await listQuotesWithClientsWorkflow(USER);
@@ -537,7 +537,7 @@ test("placing the risk with one insurer closes the rest as NTU", async () => {
   );
   assert.equal(
     byId.get(jensten.id)?.outcome,
-    "Lost",
+    "Declined",
     "an outcome already set is left as it was",
   );
 });
@@ -757,5 +757,120 @@ test("a date that is not a date is refused", async () => {
   await assert.rejects(
     () => updateQuoteWorkflow(USER, { id: quote.id, closed_at: "30/09/2026" }),
     /date like/,
+  );
+});
+
+test("losing the case closes the rest of the submission with it", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [nig, covea, jensten] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Jensten"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, {
+    id: nig.id,
+    outcome: "Lost",
+    lost_reason: "Price",
+    lost_note: "Stayed with their broker on a cheaper deal",
+  });
+
+  const byId = new Map(
+    (await listQuotesWithClientsWorkflow(USER)).map((quote) => [quote.id, quote]),
+  );
+
+  for (const id of [covea.id, jensten.id]) {
+    assert.equal(byId.get(id)?.outcome, "Lost", "one lost case, not three");
+    assert.equal(byId.get(id)?.stage, 6);
+    // One case, one reason — so it does not have to be typed three times.
+    assert.equal(byId.get(id)?.lost_reason, "Price");
+    assert.equal(
+      byId.get(id)?.lost_note,
+      "Stayed with their broker on a cheaper deal",
+    );
+  }
+});
+
+test("an insurer declining leaves the rest of the submission alone", async () => {
+  resetStore();
+  const {
+    createQuotesWorkflow,
+    updateQuoteWorkflow,
+    listQuotesWithClientsWorkflow,
+    listBusinessesWorkflow,
+  } = loadServices();
+
+  const [nig, covea, jensten] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Jensten"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Declined" });
+
+  const byId = new Map(
+    (await listQuotesWithClientsWorkflow(USER)).map((quote) => [quote.id, quote]),
+  );
+
+  assert.equal(byId.get(nig.id)?.outcome, "Declined");
+  assert.equal(byId.get(nig.id)?.stage, 6, "it closes its own card");
+  assert.equal(byId.get(covea.id)?.outcome, null, "the others carry on");
+  assert.equal(byId.get(jensten.id)?.outcome, null);
+
+  // And the client is still being quoted, because two insurers are looking.
+  const businesses = await listBusinessesWorkflow(USER);
+
+  assert.equal(businesses[0].pipeline_status, "quoting");
+});
+
+test("every insurer declining still leaves the client being quoted", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listBusinessesWorkflow } =
+    loadServices();
+
+  const [nig, covea] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Declined" });
+  await updateQuoteWorkflow(USER, { id: covea.id, outcome: "Declined" });
+
+  // Nobody would quote it, which is not the same as the client saying no —
+  // marking them lost would put a firm you never quoted on the Lost tab.
+  const businesses = await listBusinessesWorkflow(USER);
+
+  assert.equal(businesses[0].pipeline_status, "quoting");
+});
+
+test("a lost submission is dated together, not by when each was typed", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [nig, covea] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-09-01",
+  });
+
+  await updateQuoteWorkflow(USER, {
+    id: nig.id,
+    outcome: "Lost",
+    closed_at: "2026-09-30",
+  });
+
+  const byId = new Map(
+    (await listQuotesWithClientsWorkflow(USER)).map((quote) => [quote.id, quote]),
+  );
+
+  assert.equal(
+    byId.get(covea.id)?.closed_at,
+    "2026-09-30",
+    "so the whole submission lands in one period",
   );
 });
