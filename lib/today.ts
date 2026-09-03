@@ -1,13 +1,15 @@
-// What needs doing today, pulled from the three places work can hide: your own
-// reminders, call-back dates on the board, and quotes past their SLA.
+// What needs doing today, pulled from the four places work can hide: your own
+// reminders, call-back dates on the board, quotes past their SLA, and policies
+// coming up for renewal.
 
 import type { Business } from "./schemas/business";
 import type { QuoteWithClient } from "./schemas/quote";
 import type { Reminder } from "./schemas/reminder";
 import { STAGE_ACTIONS, getDaysInStage, getUrgency } from "./quote-tracker";
 import { todayIso } from "./reporting";
+import { upcomingRenewals } from "./renewals";
 
-export type TodayKind = "reminder" | "follow-up" | "quote";
+export type TodayKind = "reminder" | "follow-up" | "quote" | "renewal";
 
 export type TodayItem = {
   id: string;
@@ -103,6 +105,26 @@ export function buildTodayList(
       dueDate: null,
       overdue: urgency === "red",
       businessId: quote.business_id,
+    });
+  }
+
+  // A renewal a month out is a call to make, so it belongs in the list you
+  // already work through each morning rather than in a tab you have to
+  // remember to open.
+  for (const renewal of upcomingRenewals(quotes, today)) {
+    items.push({
+      id: `renewal:${renewal.quoteId}`,
+      sourceId: renewal.quoteId,
+      kind: "renewal",
+      title: renewal.clientName,
+      detail: `Renews ${renewal.renewalDate} · ${renewal.insurer}${
+        renewal.policyType ? ` · ${renewal.policyType}` : ""
+      }`,
+      dueDate: renewal.renewalDate,
+      // Past its renewal date is late in a way a call-back never is: the
+      // client is out of cover or has gone elsewhere.
+      overdue: renewal.daysAway <= 0,
+      businessId: renewal.businessId,
     });
   }
 

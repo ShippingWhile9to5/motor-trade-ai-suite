@@ -25,6 +25,7 @@ import {
   BellIcon,
   BoardIcon,
   ClockIcon,
+  RenewIcon,
   ComposerIcon,
   PhoneIcon,
   ScheduleIcon,
@@ -86,18 +87,21 @@ const KIND_LABEL: Record<TodayItem["kind"], string> = {
   reminder: "Reminder",
   "follow-up": "Call back",
   quote: "Quote",
+  renewal: "Renewal",
 };
 
 const KIND_ICON: Record<TodayItem["kind"], typeof BellIcon> = {
   reminder: BellIcon,
   "follow-up": PhoneIcon,
   quote: ClockIcon,
+  renewal: RenewIcon,
 };
 
 const KIND_STYLE: Record<TodayItem["kind"], string> = {
   reminder: "bg-violet-50 text-violet-700 ring-violet-100",
   "follow-up": "bg-brand-50 text-brand-700 ring-brand-100",
   quote: "bg-amber-50 text-amber-800 ring-amber-100",
+  renewal: "bg-emerald-50 text-emerald-800 ring-emerald-100",
 };
 
 function ToolStep({
@@ -274,6 +278,15 @@ function TodayRow({
     });
   }
 
+  // A renewal is a quote waiting to be raised, so Open goes to the tracker
+  // with the firm already attached rather than leaving you to find it.
+  const openHref =
+    item.kind === "renewal" && item.businessId
+      ? `/quote-tracker?business=${item.businessId}`
+      : item.kind === "quote"
+        ? "/quote-tracker"
+        : "/prospect-board";
+
   return (
     <div
       className={`rounded-md border ${
@@ -340,10 +353,14 @@ function TodayRow({
           </>
         ) : (
           <Link
-            href={item.kind === "quote" ? "/quote-tracker" : "/prospect-board"}
-            className="min-h-9 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            href={openHref}
+            className={`min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium ${
+              item.kind === "renewal"
+                ? "border-brand-200 bg-brand-50 text-brand-800 hover:bg-brand-100"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
           >
-            Open
+            {item.kind === "renewal" ? "Quote the renewal" : "Open"}
           </Link>
         )}
       </div>

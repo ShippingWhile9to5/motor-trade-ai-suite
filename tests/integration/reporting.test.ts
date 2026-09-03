@@ -242,7 +242,7 @@ test("commission is stored against the quote", async () => {
 });
 
 test("money is shown to the penny, never rounded to the pound", () => {
-  const { formatMoney, formatMoneyRounded } = require(
+  const { formatMoney } = require(
     "../../lib/reporting",
   ) as typeof import("../../lib/reporting");
 
@@ -252,8 +252,8 @@ test("money is shown to the penny, never rounded to the pound", () => {
   assert.equal(formatMoney(4200), "£4,200.00");
   assert.equal(formatMoney(0), "£0.00");
 
-  // A chart bar is an approximation already, so its label may round.
-  assert.equal(formatMoneyRounded(630.75), "£631");
+  // Including the chart, which used to round its bar labels.
+  assert.equal(formatMoney(501.5), "£501.50");
 });
 
 test("pence survive the round trip to storage and back", async () => {

@@ -221,12 +221,3 @@ export function formatMoney(value: number): string {
     maximumFractionDigits: 2,
   })}`;
 }
-
-// The one place a rounded figure is honest: a bar on a chart is already an
-// approximation, and the exact amount is on its tooltip.
-export function formatMoneyRounded(value: number): string {
-  return `£${value.toLocaleString("en-GB", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
-}

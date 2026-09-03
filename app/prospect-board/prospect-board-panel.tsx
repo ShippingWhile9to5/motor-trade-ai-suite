@@ -34,7 +34,6 @@ import type {
 import type { QuoteWithClient } from "../../lib/schemas/quote";
 import {
   formatMoney,
-  formatMoneyRounded,
   monthKey,
   monthLabel,
   monthOf,
@@ -1277,7 +1276,7 @@ function MonthChart({ quotes }: { quotes: QuoteWithClient[] }) {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
         Commission by month
       </p>
-      <div className="mt-4 flex min-w-[32rem] items-end gap-2">
+      <div className="mt-4 flex min-w-[48rem] items-end gap-2">
         {series.map((period) => {
           // A month with earnings always shows a bar, so a small one never
           // looks identical to an empty one.
@@ -1292,12 +1291,8 @@ function MonthChart({ quotes }: { quotes: QuoteWithClient[] }) {
               className="flex flex-1 flex-col items-center gap-2"
               title={`${period.label}: ${formatMoney(period.commission)} from ${period.won} deal${period.won === 1 ? "" : "s"}`}
             >
-              {/* Rounded to keep the label inside a narrow bar — the exact
-                  figure is on the tooltip above. */}
-              <span className="text-xs font-medium text-slate-600">
-                {period.commission > 0
-                  ? formatMoneyRounded(period.commission)
-                  : ""}
+              <span className="text-xs font-medium tabular-nums text-slate-600">
+                {period.commission > 0 ? formatMoney(period.commission) : ""}
               </span>
               <div
                 className={`w-full rounded-t ${
@@ -1434,6 +1429,29 @@ function ClosedRow({
           )}
         </td>
       ) : null}
+      {/* The day the policy incepted, which drives the renewal a year later.
+          Left blank rather than guessed from the win date: the two are often
+          weeks apart, and a guess would fire the reminder on the wrong day. */}
+      {outcomeLabel === "Won" ? (
+        <td className="px-4 py-3 text-slate-500">
+          {quote ? (
+            <input
+              type="date"
+              value={quote.cover_start ?? ""}
+              disabled={isPending}
+              aria-label={`On cover from, for ${business.name}`}
+              className={`min-h-9 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
+                quote.cover_start == null ? "border-amber-400" : "border-slate-300"
+              }`}
+              onChange={(event) =>
+                saveQuote({ cover_start: event.target.value })
+              }
+            />
+          ) : (
+            "—"
+          )}
+        </td>
+      ) : null}
       {/* Editable, because the day a deal is ticked is rarely the day it was
           won — and if that gap crosses a quarter end, the return is wrong. */}
       <td className="px-4 py-3 text-slate-500">
@@ -1505,6 +1523,9 @@ function ClosedList({
             <th className="px-4 py-3 font-medium">Premium</th>
             {outcomeLabel === "Won" ? (
               <th className="px-4 py-3 text-right font-medium">Total income</th>
+            ) : null}
+            {outcomeLabel === "Won" ? (
+              <th className="px-4 py-3 font-medium">On cover</th>
             ) : null}
             <th className="px-4 py-3 font-medium">
               {outcomeLabel === "Won" ? "Won" : "Closed"}

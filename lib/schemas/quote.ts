@@ -25,6 +25,9 @@ export const quoteSchema = z.object({
   // be typed rather than blocking the export on a list being complete.
   policy_type: z.string().nullable().default(null),
   fee: z.number().nullable().default(null),
+  // The day the policy incepted, typed in once the deal is placed. The
+  // renewal is twelve months after it, worked out rather than stored.
+  cover_start: z.string().nullable().default(null),
   // Stamped when the outcome is set. stage_entered_at is not a safe substitute
   // because moving the stage afterwards would reset it and shift the quarter
   // a deal was won in.
@@ -111,6 +114,17 @@ export const createQuotesInputSchema = submissionFields
   })
   .refine(hasAClient, noClient);
 
+// A date the broker types, or clears. Undefined means "not supplied", which
+// has to survive to the service so it leaves the stored value alone.
+const dateField = z
+  .union([
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-09-30."),
+    z.literal(""),
+    z.null(),
+  ])
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value || null));
+
 export const updateQuoteInputSchema = z.object({
   id: z.string().uuid(),
   insurer: z.string().trim().min(1).optional(),
@@ -131,14 +145,8 @@ export const updateQuoteInputSchema = z.object({
   // The date the deal counts as won, which is not always the day it was
   // ticked: a win on the 30th recorded on the 1st belongs in the quarter it
   // was won in, or the return goes out short.
-  closed_at: z
-    .union([
-      z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-09-30."),
-      z.literal(""),
-      z.null(),
-    ])
-    .optional()
-    .transform((value) => (value === undefined ? undefined : value || null)),
+  closed_at: dateField,
+  cover_start: dateField,
 });
 
 export const deleteQuoteInputSchema = z.object({
