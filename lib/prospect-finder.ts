@@ -31,6 +31,11 @@ export const SIC_CODE_GROUPS = [
       { code: "49420", label: "Removals" },
       // "Renting and leasing of trucks and other heavy vehicles"
       { code: "77120", label: "Truck rental" },
+      // "Other transportation support activities" — freight forwarders, many
+      // of whom run their own vehicles.
+      { code: "52290", label: "Transport support" },
+      // "Taxi operation"
+      { code: "49320", label: "Taxi operation" },
     ],
   },
 ] as const;
