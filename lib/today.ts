@@ -42,6 +42,13 @@ export function buildTodayList(
 ): TodayItem[] {
   const items: TodayItem[] = [];
   const namesById = new Map(businesses.map((business) => [business.id, business.name]));
+  // A firm with a quote in flight is already chased by that quote's own SLA
+  // row below, so its call-back would be the same job listed twice.
+  const beingQuoted = new Set(
+    quotes
+      .filter((quote) => quote.outcome === null)
+      .map((quote) => quote.business_id),
+  );
 
   for (const reminder of reminders) {
     if (reminder.done || !isDueOrOverdue(reminder.due_date, today)) {
@@ -65,11 +72,15 @@ export function buildTodayList(
   }
 
   for (const business of businesses) {
-    // A won or lost firm is off the chase list however old its date is.
+    // A won or lost firm is off the chase list however old its date is. So is
+    // one whose quote is live — chased on the quote, not on the call-back.
+    // Tested on the quote rather than the status, so a firm marked "quoting"
+    // whose quotes have all closed still shows its call-back.
     if (
       !business.follow_up ||
       business.pipeline_status === "won" ||
       business.pipeline_status === "lost" ||
+      beingQuoted.has(business.id) ||
       !isDueOrOverdue(business.follow_up, today)
     ) {
       continue;

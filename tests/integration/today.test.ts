@@ -85,7 +85,9 @@ test("today gathers reminders, call-backs and quotes that need chasing", () => {
         business({ id: "b1", follow_up: "2026-07-20" }),
         business({ id: "b2", name: "Later Ltd", follow_up: "2026-08-30" }),
       ] as never,
-      quotes: [quote()] as never,
+      // On a third firm, so the call-back above is not suppressed as the
+      // same job listed twice.
+      quotes: [quote({ business_id: "b3", client_name: "Other Ltd" })] as never,
     },
     TODAY,
   );
@@ -274,4 +276,38 @@ test("a reminder needs a real date and some words", async () => {
     () => createReminderWorkflow(USER, { body: "Call back", due_date: "Monday" }),
     /needs a date/,
   );
+});
+
+test("a call-back is dropped while that firm has a quote in flight", () => {
+  const { buildTodayList } = require(
+    "../../lib/today",
+  ) as typeof import("../../lib/today");
+
+  const args = {
+    reminders: [] as never,
+    businesses: [
+      business({ id: "b1", pipeline_status: "quoting", follow_up: "2026-07-20" }),
+    ] as never,
+  };
+
+  // The quote's own SLA row is already telling you to chase this firm.
+  const withLiveQuote = buildTodayList(
+    { ...args, quotes: [quote()] as never },
+    TODAY,
+  );
+
+  assert.deepEqual(
+    withLiveQuote.map((item) => item.kind),
+    ["quote"],
+    "chased on the quote, not twice",
+  );
+
+  // Tested on the quote, not the status: once the quotes are closed the
+  // call-back is the only thing left saying to ring them.
+  const withClosedQuote = buildTodayList(
+    { ...args, quotes: [quote({ outcome: "Lost", stage: 6 })] as never },
+    TODAY,
+  );
+
+  assert.deepEqual(withClosedQuote.map((item) => item.kind), ["follow-up"]);
 });

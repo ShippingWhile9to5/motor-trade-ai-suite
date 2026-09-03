@@ -285,7 +285,9 @@ function TodayRow({
       ? `/quote-tracker?business=${item.businessId}`
       : item.kind === "quote"
         ? "/quote-tracker"
-        : "/prospect-board";
+        : item.businessId
+          ? `/prospect-board?business=${item.businessId}`
+          : "/prospect-board";
 
   return (
     <div

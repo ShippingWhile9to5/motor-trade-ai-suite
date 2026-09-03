@@ -22,6 +22,7 @@ import {
   type UrgencyLevel,
 } from "../../lib/quote-tracker";
 import { PolicyTypeField } from "../policy-type-field";
+import { searchBusinesses } from "../../lib/prospect-board";
 import { formatMoney } from "../../lib/reporting";
 import type {
   QuoteOutcome,
@@ -82,8 +83,16 @@ function AddQuoteForm({
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const sorted = [...businesses].sort((a, b) => a.name.localeCompare(b.name));
+  const [clientQuery, setClientQuery] = useState("");
   const addingNew = form.business_id === NEW_CLIENT;
+  const picked =
+    businesses.find((business) => business.id === form.business_id) ?? null;
+  // The same search the Prospect Board uses, so a firm is found by the same
+  // words in both places. Capped, because a list past a screenful is a scroll
+  // again.
+  const matches = searchBusinesses(businesses, clientQuery)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, 8);
   const otherPolicy = form.policy_type === OTHER_POLICY;
   const policyName = otherPolicy
     ? form.other_policy_type.trim()
@@ -123,6 +132,7 @@ function AddQuoteForm({
           notes: form.notes,
         });
         setForm({ ...emptyForm, submission_date: todayIso() });
+        setClientQuery("");
         onCreated();
       } catch (submitError) {
         setError(
@@ -146,36 +156,87 @@ function AddQuoteForm({
         Add a quote
       </h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <label className="block">
+        {/* Typed, not scrolled: a hundred-odd firms in a dropdown is a scroll
+            every single time. Still picked by id once chosen, so a near-miss
+            spelling cannot duplicate a firm that is already on the board. */}
+        <div className="block">
           <span className="block text-sm font-medium text-slate-950">
             Client
           </span>
-          {/* Picked by id, so a firm already on the board can't be duplicated
-              by a near-miss spelling. */}
-          <select
-            value={form.business_id}
-            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
-            onChange={(event) => update("business_id", event.target.value)}
-          >
-            <option value="">Select a client</option>
-            {sorted.map((business) => (
-              <option key={business.id} value={business.id}>
-                {business.name}
-              </option>
-            ))}
-            <option value={NEW_CLIENT}>+ Not on my board yet</option>
-          </select>
+          {picked ? (
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-950">
+                {picked.name}
+              </span>
+              <button
+                type="button"
+                className="min-h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                onClick={() => {
+                  update("business_id", "");
+                  setClientQuery("");
+                }}
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={clientQuery}
+                placeholder="Start typing a client's name"
+                aria-label="Search for a client"
+                className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+                onChange={(event) => setClientQuery(event.target.value)}
+              />
+              {clientQuery.trim() === "" ? null : (
+                <ul className="mt-1 max-h-56 overflow-y-auto rounded-md border border-slate-200 bg-white">
+                  {matches.map((business) => (
+                    <li key={business.id}>
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-sm text-slate-950 hover:bg-slate-50"
+                        onClick={() => update("business_id", business.id)}
+                      >
+                        {business.name}
+                      </button>
+                    </li>
+                  ))}
+                  <li className="border-t border-slate-200">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm font-medium text-brand-800 hover:bg-brand-50"
+                      onClick={() =>
+                        // What was typed to search with is the name, so it is
+                        // carried over rather than typed a second time.
+                        setForm((current) => ({
+                          ...current,
+                          business_id: NEW_CLIENT,
+                          client_name: clientQuery.trim(),
+                        }))
+                      }
+                    >
+                      {matches.length === 0
+                        ? `No match — add "${clientQuery.trim()}" as a new client`
+                        : "+ Not on my board yet"}
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </>
+          )}
           {addingNew ? (
             <input
               type="text"
               autoFocus
               value={form.client_name}
               placeholder="e.g. Brookway Cars Ltd"
+              aria-label="New client name"
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
               onChange={(event) => update("client_name", event.target.value)}
             />
           ) : null}
-        </label>
+        </div>
         {/* A risk goes out to several insurers at once, so this is a pick-many
             rather than a dropdown. Each one gets its own card. */}
         <fieldset className="block md:col-span-2 lg:col-span-3">

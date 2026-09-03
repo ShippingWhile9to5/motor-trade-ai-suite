@@ -59,6 +59,7 @@ import {
 type ProspectBoardPanelProps = {
   businesses: Business[];
   quotes: QuoteWithClient[];
+  focusBusinessId: string | null;
   loadError: boolean;
 };
 
@@ -1554,24 +1555,43 @@ function ClosedList({
   );
 }
 
+// Arriving from Today: open on the tab the firm actually lives in, on a view
+// wide enough to include it, with its card already open.
+function tabForStatus(status: BusinessPipelineStatus): BoardTab {
+  if (status === "won") return "won";
+  if (status === "lost") return "lost";
+
+  return "pipeline";
+}
+
 export function ProspectBoardPanel({
   businesses,
   quotes,
+  focusBusinessId,
   loadError,
 }: ProspectBoardPanelProps) {
+  const focused = focusBusinessId
+    ? businesses.find((business) => business.id === focusBusinessId) ?? null
+    : null;
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [tab, setTab] = useState<BoardTab>("pipeline");
+  const [tab, setTab] = useState<BoardTab>(
+    focused ? tabForStatus(focused.pipeline_status) : "pipeline",
+  );
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<BoardView>("to-contact");
+  // "All", not the usual opening view: a firm sent here from Today has to be
+  // on screen whatever stage it has reached.
+  const [view, setView] = useState<BoardView>(focused ? "all" : "to-contact");
   // Each view opens in the sort that suits its job; changing view resets it,
   // and this dropdown overrides.
   const [sort, setSort] = useState<BoardSort>(
-    DEFAULT_SORT_FOR_VIEW["to-contact"],
+    DEFAULT_SORT_FOR_VIEW[focused ? "all" : "to-contact"],
   );
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(
+    focused ? focused.id : null,
+  );
   // Set when arriving at the return from a won deal, so it opens on that
   // deal's quarter instead of leaving you to find it.
   const [incomeQuarter, setIncomeQuarter] = useState<string | null>(null);
