@@ -93,3 +93,36 @@ test("SIC code input is validated", async () => {
     /SIC code/,
   );
 });
+
+test("the quick picks are grouped by book, with valid codes", () => {
+  const { SIC_CODE_GROUPS } = require(
+    "../../lib/prospect-finder",
+  ) as typeof import("../../lib/prospect-finder");
+  const { searchCompaniesInputSchema } = require(
+    "../../lib/schemas/companies-house",
+  ) as typeof import("../../lib/schemas/companies-house");
+
+  assert.deepEqual(
+    SIC_CODE_GROUPS.map((group) => group.label),
+    ["Motor trade", "Fleet & haulage"],
+  );
+
+  const codes = SIC_CODE_GROUPS.flatMap((group) =>
+    group.codes.map((sic) => sic.code),
+  );
+
+  // Every button has to survive the same validation a typed code does, or it
+  // would offer a search that cannot run.
+  for (const code of codes) {
+    assert.doesNotThrow(() =>
+      searchCompaniesInputSchema.parse({ sic_code: code }),
+    );
+  }
+
+  assert.equal(
+    new Set(codes).size,
+    codes.length,
+    "no code offered twice under two headings",
+  );
+  assert.ok(codes.includes("49410"), "road haulage, for the fleet side");
+});

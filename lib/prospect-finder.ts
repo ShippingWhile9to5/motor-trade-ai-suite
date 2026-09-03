@@ -1,16 +1,38 @@
 import type { CreateBusinessInput } from "./schemas/business";
 import type { CompanySearchResult } from "./schemas/companies-house";
 
-// Common motor-trade SIC codes, offered as quick picks in the search form.
-export const MOTOR_TRADE_SIC_CODES = [
-  { code: "45112", label: "Used car dealers" },
-  { code: "45111", label: "New car dealers" },
-  { code: "45200", label: "Repair & servicing" },
-  { code: "45190", label: "Other vehicle sales" },
-  { code: "45400", label: "Motorcycles" },
-  { code: "45320", label: "Parts — retail" },
-  { code: "45310", label: "Parts — wholesale" },
-  { code: "77110", label: "Vehicle leasing" },
+// Quick picks for the search form, grouped by the book they belong to. The
+// grouping is the point: a flat list says nothing about which codes are worth
+// searching for the class you are writing today.
+//
+// Labels are shortened for a button; the code beside each one is what actually
+// gets searched, and the official Companies House wording is in the comment
+// where the two differ enough to matter.
+export const SIC_CODE_GROUPS = [
+  {
+    label: "Motor trade",
+    codes: [
+      { code: "45112", label: "Used car dealers" },
+      { code: "45111", label: "New car dealers" },
+      { code: "45200", label: "Repair & servicing" },
+      { code: "45190", label: "Other vehicle sales" },
+      { code: "45400", label: "Motorcycles" },
+      { code: "45320", label: "Parts — retail" },
+      { code: "45310", label: "Parts — wholesale" },
+      { code: "77110", label: "Vehicle leasing" },
+    ],
+  },
+  {
+    label: "Fleet & haulage",
+    codes: [
+      // "Freight transport by road"
+      { code: "49410", label: "Road freight (haulage)" },
+      // "Removal services"
+      { code: "49420", label: "Removals" },
+      // "Renting and leasing of trucks and other heavy vehicles"
+      { code: "77120", label: "Truck rental" },
+    ],
+  },
 ] as const;
 
 export function formatCompanyAddress(result: CompanySearchResult): string {

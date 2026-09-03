@@ -6,7 +6,7 @@ import {
   searchCompaniesAction,
 } from "../actions/prospect-finder";
 import {
-  MOTOR_TRADE_SIC_CODES,
+  SIC_CODE_GROUPS,
   formatCompanyAddress,
   formatIncorporatedDate,
 } from "../../lib/prospect-finder";
@@ -136,8 +136,9 @@ export function ProspectFinderPanel() {
             Prospect Finder
           </h1>
           <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-            Search Companies House by SIC code to find motor-trade firms, then
-            save any of them straight to your prospects.
+            Search Companies House by SIC code to find firms worth quoting —
+            motor trade, fleet and haulage — then save any of them straight to
+            your prospects.
           </p>
         </div>
       </header>
@@ -156,22 +157,29 @@ export function ProspectFinderPanel() {
               className="mt-2 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
               onChange={(event) => setSicCode(event.target.value)}
             />
-            <span className="mt-2 flex flex-wrap gap-1.5">
-              {MOTOR_TRADE_SIC_CODES.map((sic) => (
-                <button
-                  key={sic.code}
-                  type="button"
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    sicCode === sic.code
-                      ? "border-slate-400 bg-slate-100 text-slate-950"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                  onClick={() => setSicCode(sic.code)}
-                >
-                  {sic.code} · {sic.label}
-                </button>
-              ))}
-            </span>
+            {SIC_CODE_GROUPS.map((group) => (
+              <span key={group.label} className="mt-3 block">
+                <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {group.label}
+                </span>
+                <span className="mt-1.5 flex flex-wrap gap-1.5">
+                  {group.codes.map((sic) => (
+                    <button
+                      key={sic.code}
+                      type="button"
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        sicCode === sic.code
+                          ? "border-slate-400 bg-slate-100 text-slate-950"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                      onClick={() => setSicCode(sic.code)}
+                    >
+                      {sic.code} · {sic.label}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            ))}
           </label>
           <label className="block">
             <span className="block text-sm font-medium text-slate-950">
