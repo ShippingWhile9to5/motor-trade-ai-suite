@@ -12,3 +12,6 @@ dist
 # they carry their own node_modules and .env.local files, so they must not
 # be committed here. Delete once each migration phase is complete.
 migration-source
+
+# Exported CRM data. Client information — never commit these.
+backups
