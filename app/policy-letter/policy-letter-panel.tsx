@@ -470,34 +470,61 @@ export function PolicyLetterPanel() {
 
         <div>
           <h3 className="text-sm font-medium text-slate-950">
-            Benefits included
+            Important Information
           </h3>
           <p className="mt-1 text-xs text-slate-500">
-            Ticked automatically based on the insurer selected - change them if
+            One line each in the letter&apos;s Important Information section.
+            The first two are ticked from the insurer selected - change them if
             this policy differs.
           </p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            <CheckboxInput
-              label="Premier Protected NCD"
-              checked={manualInput.benefits.premierProtectedNcd}
-              onChange={(checked) =>
-                updateManualField("benefits", {
-                  ...manualInput.benefits,
-                  premierProtectedNcd: checked,
-                })
-              }
-            />
-            <CheckboxInput
-              label="Low Claims Rebate"
-              checked={manualInput.benefits.lowClaimsRebate}
-              onChange={(checked) =>
-                updateManualField("benefits", {
-                  ...manualInput.benefits,
-                  lowClaimsRebate: checked,
-                })
+            {(
+              [
+                ["premierProtectedNcd", "Premier Protected NCD"],
+                ["lowClaimsRebate", "Low Claims Rebate"],
+                ["protectedNcd", "Protected no claims discount"],
+                ["unaccompaniedDemonstrations", "Unaccompanied demonstrations"],
+                ["loanAndHire", "Loan and hire vehicles"],
+                ["floodExcluded", "Flood cover excluded"],
+              ] as const
+            ).map(([key, label]) => (
+              <CheckboxInput
+                key={key}
+                label={label}
+                checked={manualInput.benefits[key]}
+                onChange={(checked) =>
+                  updateManualField("benefits", {
+                    ...manualInput.benefits,
+                    [key]: checked,
+                  })
+                }
+              />
+            ))}
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <TextInput
+              label="Single vehicle limit (optional)"
+              value={manualInput.singleVehicleLimit}
+              placeholder="e.g. 100K"
+              onChange={(value) =>
+                updateManualField("singleVehicleLimit", value)
               }
             />
           </div>
+          <label className="mt-3 block">
+            <span className="block text-sm font-medium text-slate-950">
+              Anything else agreed (one per line)
+            </span>
+            <textarea
+              rows={3}
+              value={manualInput.extraInformation}
+              placeholder={"Quotation includes...\nQuotation excludes..."}
+              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950"
+              onChange={(event) =>
+                updateManualField("extraInformation", event.target.value)
+              }
+            />
+          </label>
         </div>
       </Section>
 
@@ -518,16 +545,27 @@ export function PolicyLetterPanel() {
       </div>
 
       {outputs ? (
+        // In the order they appear in the letter, so it is worked top to
+        // bottom rather than hunted through.
         <div className="space-y-6">
           <OutputCard
-            title="Opening paragraph"
-            text={outputs.openingParagraph}
+            title="Valid until (the date to correct)"
+            text={outputs.validityDate}
           />
+          {outputs.importantInformation ? (
+            <OutputCard
+              title="Important Information"
+              text={outputs.importantInformation}
+            />
+          ) : null}
           {outputs.endorsementsAndConditions ? (
             <OutputCard
               title="Endorsements and Conditions"
               text={outputs.endorsementsAndConditions}
             />
+          ) : null}
+          {outputs.policyExcesses ? (
+            <OutputCard title="Policy Excesses" text={outputs.policyExcesses} />
           ) : null}
           {outputs.significantExclusions ? (
             <OutputCard
@@ -535,9 +573,12 @@ export function PolicyLetterPanel() {
               text={outputs.significantExclusions}
             />
           ) : null}
-          {outputs.excesses ? (
-            <OutputCard title="Excesses" text={outputs.excesses} />
-          ) : null}
+          {/* Acturis writes this itself; here for the rare time it is wanted
+              whole. */}
+          <OutputCard
+            title="Opening paragraph (Acturis usually writes this)"
+            text={outputs.openingParagraph}
+          />
         </div>
       ) : null}
     </section>

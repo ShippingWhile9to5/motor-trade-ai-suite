@@ -16,30 +16,62 @@ export const INSURERS = [
 // the usual panel, not every insurer that can ever put up a quote.
 export type Insurer = (typeof INSURERS)[number] | (string & {});
 
+// Worded as they appear in real letters. The override box exists because this
+// list will never cover every basis an insurer agrees to.
 export const DRIVER_BASIS_OPTIONS = [
+  "Any Employee under Contract of Service for Business use, named for SDP use",
   "Any Employee for Business use, Named for SDP",
+  "Any Driver for Business Use, Named for SDP",
+  "Open for Business Use, and Named for SDP",
   "Named Drivers for Business use, Named for SDP",
   "Any Driver for Business use, Any Driver for SDP",
-  "Any driver for Business and named for SDP use",
 ] as const;
 
 export type DriverBasis = (typeof DRIVER_BASIS_OPTIONS)[number];
 
+// The lines that sit under "Important Information", each either included or
+// not. They describe the basis the quotation was given on, which is why they
+// belong in that section rather than in the opening paragraph.
 export interface PolicyLetterBenefits {
   premierProtectedNcd: boolean;
   lowClaimsRebate: boolean;
+  protectedNcd: boolean;
+  unaccompaniedDemonstrations: boolean;
+  loanAndHire: boolean;
+  floodExcluded: boolean;
 }
 
 const NO_BENEFITS: PolicyLetterBenefits = {
   premierProtectedNcd: false,
   lowClaimsRebate: false,
+  protectedNcd: false,
+  unaccompaniedDemonstrations: false,
+  loanAndHire: false,
+  floodExcluded: false,
 };
+
+// One line each, worded as the letters word them.
+const BENEFIT_LINES: { key: keyof PolicyLetterBenefits; line: string }[] = [
+  { key: "premierProtectedNcd", line: "Quotation includes Premier Protected NCD" },
+  { key: "lowClaimsRebate", line: "Quotation includes Low Claims Rebate" },
+  { key: "protectedNcd", line: "Quotation includes protected no claims discount" },
+  {
+    key: "unaccompaniedDemonstrations",
+    line: "Quotation includes unaccompanied demonstrations",
+  },
+  { key: "loanAndHire", line: "Quotation includes Loan and Hire vehicles" },
+  { key: "floodExcluded", line: "Quotation excludes flood cover" },
+];
 
 // Insurers that include these benefits as standard. Applied when the insurer
 // is selected; the broker can still tick/untick either one afterwards.
 const INSURER_DEFAULT_BENEFITS: Partial<Record<Insurer, PolicyLetterBenefits>> = {
-  "Intact (NIG)": { premierProtectedNcd: true, lowClaimsRebate: true },
-  "Covéa Insurance": { premierProtectedNcd: true, lowClaimsRebate: false },
+  "Intact (NIG)": {
+    ...NO_BENEFITS,
+    premierProtectedNcd: true,
+    lowClaimsRebate: true,
+  },
+  "Covéa Insurance": { ...NO_BENEFITS, premierProtectedNcd: true },
 };
 
 export function defaultBenefitsForInsurer(
@@ -57,6 +89,10 @@ export interface PolicyLetterManualInput {
   driverBasis: DriverBasis | "";
   driverBasisOverride: string;
   benefits: PolicyLetterBenefits;
+  /** e.g. `100K` — becomes a single vehicle limit line when filled in. */
+  singleVehicleLimit: string;
+  /** Anything agreed on this risk that no tick-box covers, one per line. */
+  extraInformation: string;
   /** ISO `YYYY-MM-DD`, as produced by an `<input type="date">`. */
   quoteDate: string;
 }
@@ -75,6 +111,8 @@ export function createBlankPolicyLetterManualInput(): PolicyLetterManualInput {
     driverBasis: "",
     driverBasisOverride: "",
     benefits: { ...NO_BENEFITS },
+    singleVehicleLimit: "",
+    extraInformation: "",
     quoteDate: todayIsoDate(),
   };
 }
@@ -121,60 +159,68 @@ export function calculateValidityDate(quoteDateIso: string): string {
   return formatUkLongDate(validity);
 }
 
-function benefitNames(benefits: PolicyLetterBenefits): string[] {
-  const names: string[] = [];
-
-  if (benefits.premierProtectedNcd) {
-    names.push("Premier Protected NCD");
-  }
-
-  if (benefits.lowClaimsRebate) {
-    names.push("Low Claims Rebate");
-  }
-
-  return names;
-}
-
-function toNaturalList(values: string[]): string {
-  if (values.length <= 1) {
-    return values[0] ?? "";
-  }
-
-  return `${values.slice(0, -1).join(", ")} and ${values[values.length - 1]}`;
-}
-
 export function resolveDriverBasis(input: PolicyLetterManualInput): string {
   return (input.driverBasisOverride.trim() || input.driverBasis).trim();
 }
 
+// Acturis writes this paragraph itself; only the date is corrected by hand, so
+// the date is the useful output and the sentence is here for the odd occasion
+// it is pasted whole. The driver basis and the benefits deliberately do NOT
+// appear — in a real letter they sit under Important Information.
 export function generateOpeningParagraph(
   input: PolicyLetterManualInput,
 ): string {
-  const sentences = [
+  return [
     "Thank you for getting in touch with us for a quotation for your Motor Trade Combined.",
     `We are pleased to provide the quotation below which is valid until ${calculateValidityDate(input.quoteDate)} and is based upon the details you have provided.`,
-  ];
+  ].join(" ");
+}
 
-  const benefits = benefitNames(input.benefits);
-
-  if (benefits.length > 0) {
-    sentences.push(`This policy includes the ${toNaturalList(benefits)}.`);
-  }
-
+// The section the broker types every time: the basis the quotation was given
+// on. One statement per line, in the order the letters use.
+export function generateImportantInformation(
+  input: PolicyLetterManualInput,
+): string {
+  const lines: string[] = [];
   const driverBasis = resolveDriverBasis(input);
 
   if (driverBasis) {
-    sentences.push(`The driver basis for this policy is ${driverBasis}.`);
+    lines.push(`Driver basis is ${driverBasis}`);
   }
 
-  return sentences.join(" ");
+  for (const { key, line } of BENEFIT_LINES) {
+    if (input.benefits[key]) {
+      lines.push(line);
+    }
+  }
+
+  const limit = input.singleVehicleLimit.trim();
+
+  if (limit) {
+    // Typed as "100K" or "£100,000" — either way it reads as a limit.
+    const amount = limit.startsWith("£") ? limit : `£${limit}`;
+
+    lines.push(`Single vehicle limit set at ${amount} for own and customer vehicles`);
+  }
+
+  // Anything this risk needed that no tick-box covers, kept exactly as typed.
+  for (const extra of input.extraInformation.split("\n")) {
+    if (extra.trim()) {
+      lines.push(extra.trim());
+    }
+  }
+
+  return lines.join("\n");
 }
 
 export interface PolicyLetterOutputs {
+  /** The one thing corrected by hand in Acturis's own opening paragraph. */
+  validityDate: string;
   openingParagraph: string;
+  importantInformation: string;
   endorsementsAndConditions: string;
+  policyExcesses: string;
   significantExclusions: string;
-  excesses: string;
 }
 
 export function generatePolicyLetterOutputs(
@@ -182,11 +228,13 @@ export function generatePolicyLetterOutputs(
   input: PolicyLetterManualInput,
 ): PolicyLetterOutputs {
   return {
+    validityDate: calculateValidityDate(input.quoteDate),
     openingParagraph: generateOpeningParagraph(input),
+    importantInformation: generateImportantInformation(input),
     endorsementsAndConditions: (
       extractedData?.endorsementsAndConditions ?? []
     ).join("\n"),
+    policyExcesses: (extractedData?.excesses ?? []).join("\n"),
     significantExclusions: (extractedData?.exclusions ?? []).join("\n"),
-    excesses: (extractedData?.excesses ?? []).join("\n"),
   };
 }
