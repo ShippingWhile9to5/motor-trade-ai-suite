@@ -874,3 +874,87 @@ test("a lost submission is dated together, not by when each was typed", async ()
     "so the whole submission lands in one period",
   );
 });
+
+test("a lost reason edited later carries across the whole case", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [nig, covea, jensten] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Jensten"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: nig.id, outcome: "Lost" });
+
+  // Recorded afterwards, on whichever card the board happened to show. Without
+  // this carrying across, the three cards hold three different answers and the
+  // row appears to flip between insurers as it is redrawn.
+  await updateQuoteWorkflow(USER, {
+    id: covea.id,
+    lost_reason: "Price",
+    lost_note: "Beaten by £400",
+  });
+
+  const byId = new Map(
+    (await listQuotesWithClientsWorkflow(USER)).map((quote) => [quote.id, quote]),
+  );
+
+  for (const id of [nig.id, covea.id, jensten.id]) {
+    assert.equal(byId.get(id)?.lost_reason, "Price");
+    assert.equal(byId.get(id)?.lost_note, "Beaten by £400");
+  }
+});
+
+test("a reason does not leak onto another firm's lost case", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  const [ours] = await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea"],
+    submission_date: "2026-07-24",
+  });
+  const [theirs] = await createQuotesWorkflow(USER, {
+    client_name: "Marson and Sons Ltd",
+    insurers: ["NIG"],
+    submission_date: "2026-07-24",
+  });
+
+  await updateQuoteWorkflow(USER, { id: theirs.id, outcome: "Lost" });
+  await updateQuoteWorkflow(USER, {
+    id: ours.id,
+    outcome: "Lost",
+    lost_reason: "Cover",
+  });
+
+  const byId = new Map(
+    (await listQuotesWithClientsWorkflow(USER)).map((quote) => [quote.id, quote]),
+  );
+
+  assert.equal(byId.get(theirs.id)?.lost_reason, null, "a different firm");
+});
+
+test("quotes come back in a stable order", async () => {
+  resetStore();
+  const { createQuotesWorkflow, updateQuoteWorkflow, listQuotesWithClientsWorkflow } =
+    loadServices();
+
+  await createQuotesWorkflow(USER, {
+    client_name: "Brookway Cars Ltd",
+    insurers: ["NIG", "Covea", "Aviva"],
+    submission_date: "2026-07-24",
+  });
+
+  const before = (await listQuotesWithClientsWorkflow(USER)).map((q) => q.id);
+
+  // An update can move a row, which is what made the board reshuffle.
+  const [first] = await listQuotesWithClientsWorkflow(USER);
+  await updateQuoteWorkflow(USER, { id: first.id, quoted_premium: "4200" });
+
+  const after = (await listQuotesWithClientsWorkflow(USER)).map((q) => q.id);
+
+  assert.deepEqual(after, before, "same order before and after a write");
+});

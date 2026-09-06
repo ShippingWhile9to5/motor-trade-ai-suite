@@ -1337,19 +1337,61 @@ function ClosedRow({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // The quote this row reports on. A lost case can also carry NTU and Declined
-  // cards against the same firm, so the one matching the tab is preferred and
-  // any closed one will do rather than showing a dash.
+  // The quote this row reports on. A settled case carries a card per insurer,
+  // so the pick has to be deterministic — picking whichever happened to come
+  // back first made the row appear to flip between insurers as it was worked.
   const forBusiness = quotes.filter((row) => row.business_id === business.id);
+  const settled = forBusiness
+    .filter((row) => row.outcome !== null)
+    .sort(
+      (a, b) =>
+        (b.closed_at ?? "").localeCompare(a.closed_at ?? "") ||
+        a.insurer.localeCompare(b.insurer),
+    );
   const quote =
-    forBusiness.find((row) => row.outcome === outcomeLabel) ??
-    forBusiness.find((row) => row.outcome !== null);
+    settled.find((row) => row.outcome === outcomeLabel) ?? settled[0];
+  // The others of the same submission, so the row can say it stands for all of
+  // them rather than silently reporting one.
+  const sameCase = quote
+    ? settled.filter(
+        (row) =>
+          row.submission_date === quote.submission_date &&
+          row.outcome === quote.outcome,
+      )
+    : [];
   const quoteCount = forBusiness.length;
-  // The premium belongs to the quote, so it stays editable here. Income
-  // belongs to the return, and is entered on the Commission tab.
-  const [premium, setPremium] = useState(
-    quote?.quoted_premium == null ? "" : String(quote.quoted_premium),
-  );
+  // Held as a draft and written by one button. Saving each box as it lost
+  // focus meant a reason and its note went to the server separately, and the
+  // row redrew in between.
+  const storedRow = {
+    premium: quote?.quoted_premium == null ? "" : String(quote.quoted_premium),
+    reason: quote?.lost_reason ?? "",
+    note: quote?.lost_note ?? "",
+  };
+  const [row, setRow] = useState(storedRow);
+  const signature = `${quote?.id ?? ""}|${storedRow.premium}|${storedRow.reason}|${storedRow.note}`;
+  const [savedSignature, setSavedSignature] = useState(signature);
+
+  if (savedSignature !== signature) {
+    setSavedSignature(signature);
+    setRow(storedRow);
+  }
+
+  const rowChanges: Record<string, string> = {};
+
+  if (row.premium.trim() !== storedRow.premium) {
+    rowChanges.quoted_premium = row.premium;
+  }
+
+  if (row.reason !== storedRow.reason) {
+    rowChanges.lost_reason = row.reason;
+  }
+
+  if (row.note.trim() !== storedRow.note) {
+    rowChanges.lost_note = row.note.trim();
+  }
+
+  const rowDirty = Object.keys(rowChanges).length > 0;
 
   function saveQuote(changes: Record<string, unknown>) {
     if (!quote) {
@@ -1392,25 +1434,25 @@ function ClosedRow({
         ) : null}
         {error ? <p className="text-xs text-red-600">{error}</p> : null}
       </td>
-      <td className="px-4 py-3 text-slate-600">{quote?.insurer ?? "—"}</td>
+      {/* Every insurer of the case, not just the one the row happens to read
+          from — four cards behind one line was the confusing part. */}
+      <td className="px-4 py-3 text-slate-600">
+        {sameCase.length > 1
+          ? sameCase.map((row) => row.insurer).join(", ")
+          : quote?.insurer ?? "—"}
+      </td>
       <td className="px-4 py-3 text-slate-600">
         {quote ? (
           <input
             type="number"
-            value={premium}
+            value={row.premium}
             placeholder="0.00"
             disabled={isPending}
             aria-label={`Gross premium for ${business.name}`}
             className="min-h-9 w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-950"
-            onChange={(event) => setPremium(event.target.value)}
-            onBlur={() => {
-              const current =
-                quote.quoted_premium == null ? "" : String(quote.quoted_premium);
-
-              if (premium.trim() !== current) {
-                saveQuote({ quoted_premium: premium });
-              }
-            }}
+            onChange={(event) =>
+              setRow((current) => ({ ...current, premium: event.target.value }))
+            }
           />
         ) : (
           "—"
@@ -1450,16 +1492,14 @@ function ClosedRow({
           {quote ? (
             <div className="flex flex-col gap-1">
               <select
-                value={quote.lost_reason ?? ""}
+                value={row.reason}
                 disabled={isPending}
                 aria-label={`Why ${business.name} was lost`}
                 className={`min-h-9 w-44 rounded-md border bg-white px-2 py-1 text-sm text-slate-950 ${
-                  quote.lost_reason == null
-                    ? "border-amber-400"
-                    : "border-slate-300"
+                  row.reason === "" ? "border-amber-400" : "border-slate-300"
                 }`}
                 onChange={(event) =>
-                  saveQuote({ lost_reason: event.target.value })
+                  setRow((current) => ({ ...current, reason: event.target.value }))
                 }
               >
                 <option value="">Not recorded</option>
@@ -1471,19 +1511,20 @@ function ClosedRow({
               </select>
               <input
                 type="text"
-                defaultValue={quote.lost_note ?? ""}
+                value={row.note}
                 placeholder="Note (optional)"
                 disabled={isPending}
                 aria-label={`Note on losing ${business.name}`}
                 className="min-h-9 w-44 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-950"
-                onBlur={(event) => {
-                  const next = event.target.value.trim();
-
-                  if (next !== (quote.lost_note ?? "")) {
-                    saveQuote({ lost_note: next });
-                  }
-                }}
+                onChange={(event) =>
+                  setRow((current) => ({ ...current, note: event.target.value }))
+                }
               />
+              {sameCase.length > 1 ? (
+                <span className="text-xs text-slate-500">
+                  Applies to all {sameCase.length} insurers
+                </span>
+              ) : null}
             </div>
           ) : (
             "—"
@@ -1533,6 +1574,16 @@ function ClosedRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2">
+          {quote ? (
+            <button
+              type="button"
+              disabled={!rowDirty || isPending}
+              className="min-h-9 shrink-0 rounded-md bg-brand-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-800 disabled:bg-slate-100 disabled:text-slate-400"
+              onClick={() => saveQuote(rowChanges)}
+            >
+              {isPending ? "Saving…" : rowDirty ? "Save" : "Saved"}
+            </button>
+          ) : null}
           {/* A won client comes round again at renewal, and that is a new
               quote on the same firm. */}
           <Link

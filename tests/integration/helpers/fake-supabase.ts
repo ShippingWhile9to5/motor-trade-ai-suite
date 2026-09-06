@@ -47,8 +47,11 @@ function matchesFilters(row: Row, filters: Filter[]): boolean {
   });
 }
 
+type Sort = { col: string; ascending: boolean };
+
 function createQuery(table: string) {
   const filters: Filter[] = [];
+  const sorts: Sort[] = [];
   let mode: "select" | "insert" | "update" | "delete" = "select";
   let payload: Row | null = null;
 
@@ -91,7 +94,25 @@ function createQuery(table: string) {
 
     const matched = filters.length
       ? rows.filter((row) => matchesFilters(row, filters))
-      : rows;
+      : [...rows];
+
+    // Applied in the order they were chained, like Postgres: the first .order()
+    // is the primary sort and later ones break its ties.
+    if (sorts.length) {
+      matched.sort((a, b) => {
+        for (const sort of sorts) {
+          const left = `${a[sort.col] ?? ""}`;
+          const right = `${b[sort.col] ?? ""}`;
+          const compared = left.localeCompare(right);
+
+          if (compared !== 0) {
+            return sort.ascending ? compared : -compared;
+          }
+        }
+
+        return 0;
+      });
+    }
 
     return asReturn(matched);
   }
@@ -110,6 +131,10 @@ function createQuery(table: string) {
     },
     ilike(col: string, val: unknown) {
       filters.push({ col, op: "ilike", val });
+      return builder;
+    },
+    order(col: string, options?: { ascending?: boolean }) {
+      sorts.push({ col, ascending: options?.ascending !== false });
       return builder;
     },
     insert(row: Row) {

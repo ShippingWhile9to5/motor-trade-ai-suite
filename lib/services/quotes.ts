@@ -188,6 +188,16 @@ export async function updateQuoteWorkflow(
   // quote says nothing about the ones still looking at the risk, so it closes
   // its own card and leaves both the siblings and the client alone.
 
+  // One case has one reason, so editing it afterwards carries to the rest of
+  // the submission. Without this the four cards of a lost case drift apart and
+  // the answer depends on which of them you happen to be looking at.
+  const reasonChanged =
+    changes.lost_reason !== undefined || changes.lost_note !== undefined;
+
+  if (reasonChanged && updated.outcome === "Lost") {
+    await copyLostReasonToSubmission(userId, updated);
+  }
+
   const business = await getBusinessById(userId, updated.business_id);
 
   return { ...updated, client_name: business?.name ?? "Unknown client" };
@@ -224,6 +234,29 @@ async function closeSiblingQuotes(
       stage: CLOSED_STAGE,
       closed_at: closedAt,
       stage_entered_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function copyLostReasonToSubmission(
+  userId: string,
+  settled: Quote,
+): Promise<void> {
+  const siblings = await listQuotesForBusiness(userId, settled.business_id);
+
+  for (const sibling of siblings) {
+    const sameLostCase =
+      sibling.id !== settled.id &&
+      sibling.submission_date === settled.submission_date &&
+      sibling.outcome === "Lost";
+
+    if (!sameLostCase) {
+      continue;
+    }
+
+    await updateQuoteRow(userId, sibling.id, {
+      lost_reason: settled.lost_reason,
+      lost_note: settled.lost_note,
     });
   }
 }

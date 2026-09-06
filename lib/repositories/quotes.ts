@@ -18,10 +18,16 @@ function parseRow(row: unknown): Quote {
 }
 
 export async function listQuotes(userId: string): Promise<Quote[]> {
+  // Ordered deliberately: without one Postgres promises no order at all, and
+  // an update can move a row, so an unordered list quietly reshuffles itself
+  // as the board is worked.
   const { data, error } = await supabase
     .from("quote")
     .select(quoteSelect)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .order("submission_date", { ascending: true })
+    .order("insurer", { ascending: true })
+    .order("id", { ascending: true });
 
   throwSupabaseError(error);
 
@@ -36,7 +42,10 @@ export async function listQuotesForBusiness(
     .from("quote")
     .select(quoteSelect)
     .eq("user_id", userId)
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .order("submission_date", { ascending: true })
+    .order("insurer", { ascending: true })
+    .order("id", { ascending: true });
 
   throwSupabaseError(error);
 
