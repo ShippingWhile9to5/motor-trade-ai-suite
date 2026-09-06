@@ -8,7 +8,8 @@
     "build": "next build",
     "test:integration": "tsc -p tsconfig.integration-test.json && node --conditions=react-server --test .test-build/tests/integration/*.test.js",
     "typecheck": "tsc --noEmit",
-    "backup": "node --env-file=.env.local scripts/export-backup.mjs"
+    "backup": "node --env-file=.env.local scripts/export-backup.mjs",
+    "restore": "node --env-file=.env.local scripts/restore-backup.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
