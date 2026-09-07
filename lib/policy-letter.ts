@@ -163,10 +163,9 @@ export function resolveDriverBasis(input: PolicyLetterManualInput): string {
   return (input.driverBasisOverride.trim() || input.driverBasis).trim();
 }
 
-// Acturis writes this paragraph itself; only the date is corrected by hand, so
-// the date is the useful output and the sentence is here for the odd occasion
-// it is pasted whole. The driver basis and the benefits deliberately do NOT
-// appear — in a real letter they sit under Important Information.
+// Pasted whole, with the validity date already worked out — that date is the
+// only part of it that changes. The driver basis and the benefits deliberately
+// do NOT appear here: in a real letter they sit under Important Information.
 export function generateOpeningParagraph(
   input: PolicyLetterManualInput,
 ): string {
@@ -213,14 +212,23 @@ export function generateImportantInformation(
   return lines.join("\n");
 }
 
+// The closing paragraph, word for word as it appears in every letter. Fixed
+// text, so it is a constant rather than anything generated — and it is emitted
+// verbatim, never reworded.
+export const SCOPE_OF_SERVICE =
+  "In recommending this product and insurer we have taken the following into account: " +
+  "Their level of service. Premium cost. Their expertise in this field. " +
+  "The length of time they have been established. " +
+  "Their specialism in this type of insurance.";
+
+// In the order the letter reads, top to bottom.
 export interface PolicyLetterOutputs {
-  /** The one thing corrected by hand in Acturis's own opening paragraph. */
-  validityDate: string;
   openingParagraph: string;
   importantInformation: string;
   endorsementsAndConditions: string;
   policyExcesses: string;
   significantExclusions: string;
+  scopeOfService: string;
 }
 
 export function generatePolicyLetterOutputs(
@@ -228,7 +236,6 @@ export function generatePolicyLetterOutputs(
   input: PolicyLetterManualInput,
 ): PolicyLetterOutputs {
   return {
-    validityDate: calculateValidityDate(input.quoteDate),
     openingParagraph: generateOpeningParagraph(input),
     importantInformation: generateImportantInformation(input),
     endorsementsAndConditions: (
@@ -236,5 +243,6 @@ export function generatePolicyLetterOutputs(
     ).join("\n"),
     policyExcesses: (extractedData?.excesses ?? []).join("\n"),
     significantExclusions: (extractedData?.exclusions ?? []).join("\n"),
+    scopeOfService: SCOPE_OF_SERVICE,
   };
 }

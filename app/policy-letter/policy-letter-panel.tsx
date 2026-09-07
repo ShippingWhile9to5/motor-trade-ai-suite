@@ -549,8 +549,8 @@ export function PolicyLetterPanel() {
         // bottom rather than hunted through.
         <div className="space-y-6">
           <OutputCard
-            title="Valid until (the date to correct)"
-            text={outputs.validityDate}
+            title="Opening paragraph"
+            text={outputs.openingParagraph}
           />
           {outputs.importantInformation ? (
             <OutputCard
@@ -573,12 +573,7 @@ export function PolicyLetterPanel() {
               text={outputs.significantExclusions}
             />
           ) : null}
-          {/* Acturis writes this itself; here for the rare time it is wanted
-              whole. */}
-          <OutputCard
-            title="Opening paragraph (Acturis usually writes this)"
-            text={outputs.openingParagraph}
-          />
+          <OutputCard title="Scope of Service" text={outputs.scopeOfService} />
         </div>
       ) : null}
     </section>

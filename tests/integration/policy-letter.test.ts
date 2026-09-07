@@ -253,3 +253,38 @@ test("sections stay empty when no PDF has been extracted", () => {
   assert.equal(outputs.policyExcesses, "");
   assert.match(outputs.openingParagraph, /Thank you for getting in touch/);
 });
+
+test("the scope of service paragraph is emitted verbatim", () => {
+  const { generatePolicyLetterOutputs, SCOPE_OF_SERVICE } = loadPolicyLetter();
+
+  // Word for word as it appears in every real letter. Fixed text that closes
+  // the letter, so it is never reworded or generated.
+  assert.equal(
+    SCOPE_OF_SERVICE,
+    "In recommending this product and insurer we have taken the following into account: " +
+      "Their level of service. Premium cost. Their expertise in this field. " +
+      "The length of time they have been established. " +
+      "Their specialism in this type of insurance.",
+  );
+
+  // Present whether or not a schedule was ever uploaded — it depends on
+  // nothing.
+  assert.equal(
+    generatePolicyLetterOutputs(null, baseInput()).scopeOfService,
+    SCOPE_OF_SERVICE,
+  );
+});
+
+test("the opening paragraph carries its own validity date", () => {
+  const { generatePolicyLetterOutputs } = loadPolicyLetter();
+
+  // The date is no longer offered on its own: the paragraph is pasted whole
+  // with the date already in it.
+  const outputs = generatePolicyLetterOutputs(
+    null,
+    baseInput({ quoteDate: "2026-07-13" }),
+  );
+
+  assert.match(outputs.openingParagraph, /valid until 12th August 2026 and is/);
+  assert.equal("validityDate" in outputs, false);
+});
