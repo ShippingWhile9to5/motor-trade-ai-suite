@@ -33,8 +33,16 @@ export type RenewalWindow = {
   incorporatedLabel: string;
 };
 
-// The Finder stores the incorporation date as it is shown, DD/MM/YYYY. An ISO
-// date is accepted too, so a manually typed one works either way.
+const MONTH_NAMES = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+// Three formats are on the board: the Finder writes DD/MM/YYYY, the import
+// from the old standalone tool wrote "22 July 1993", and a typed ISO date is
+// accepted so a manual entry works too. Checked against the real data — the
+// long form is most of what is there, and missing it would have shown nothing
+// on the bulk of the board.
 export function parseIncorporated(
   value: string | null,
 ): { year: number; month: number } | null {
@@ -42,16 +50,27 @@ export function parseIncorporated(
     return null;
   }
 
-  const uk = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  const text = value.trim();
+  const uk = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
 
   if (uk) {
     return { year: Number(uk[3]), month: Number(uk[2]) };
   }
 
-  const iso = /^(\d{4})-(\d{2})-\d{2}/.exec(value.trim());
+  const iso = /^(\d{4})-(\d{2})-\d{2}/.exec(text);
 
   if (iso) {
     return { year: Number(iso[1]), month: Number(iso[2]) };
+  }
+
+  const long = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(text);
+
+  if (long) {
+    const month = MONTH_NAMES.indexOf(long[2].toLowerCase()) + 1;
+
+    if (month > 0) {
+      return { year: Number(long[3]), month };
+    }
   }
 
   return null;

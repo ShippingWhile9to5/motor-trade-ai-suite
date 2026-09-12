@@ -33,6 +33,9 @@ test("the incorporation date is read as the Finder stores it, or as ISO", () => 
 
   assert.deepEqual(parseIncorporated("14/03/2019"), { year: 2019, month: 3 });
   assert.deepEqual(parseIncorporated("2019-03-14"), { year: 2019, month: 3 });
+  // The import from the old tool wrote the long form — most of the board.
+  assert.deepEqual(parseIncorporated("22 July 1993"), { year: 1993, month: 7 });
+  assert.deepEqual(parseIncorporated("2 July 1957"), { year: 1957, month: 7 });
   // Nothing to go on gives no guess, rather than a wrong one.
   assert.equal(parseIncorporated(null), null);
   assert.equal(parseIncorporated("March 2019"), null);
