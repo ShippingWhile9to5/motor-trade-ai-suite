@@ -4,6 +4,7 @@ import type {
   CreateBusinessInput,
 } from "./schemas/business";
 import type { ImportedActivity, ImportedProspect } from "./schemas/prospect-import";
+import { isRenewingSoon, renewalSortKey } from "./likely-renewal";
 
 export const PIPELINE_STATUSES: BusinessPipelineStatus[] = [
   "prospect",
@@ -93,15 +94,16 @@ export type BoardFilters = {
   onlyDue: boolean;
 };
 
-export type BoardSort = "rating" | "name" | "followUp" | "callable";
+export type BoardSort = "rating" | "name" | "followUp" | "callable" | "renewal";
 
 // Named views, so the board answers a question rather than showing everything
 // and leaving you to find the answer in it.
-export type BoardView = "due" | "to-contact" | "working" | "all";
+export type BoardView = "due" | "to-contact" | "renewing" | "working" | "all";
 
 export const BOARD_VIEWS: { value: BoardView; label: string }[] = [
   { value: "due", label: "Due today" },
   { value: "to-contact", label: "To contact" },
+  { value: "renewing", label: "Renewing soon" },
   { value: "working", label: "Working" },
   { value: "all", label: "All" },
 ];
@@ -111,6 +113,7 @@ export const BOARD_VIEWS: { value: BoardView; label: string }[] = [
 export const DEFAULT_SORT_FOR_VIEW: Record<BoardView, BoardSort> = {
   due: "followUp",
   "to-contact": "callable",
+  renewing: "renewal",
   working: "followUp",
   all: "name",
 };
@@ -131,6 +134,18 @@ export function filterByView(
   if (view === "to-contact") {
     return businesses.filter(
       (business) => business.pipeline_status === "prospect",
+    );
+  }
+
+  // Firms whose policy probably renews in the next couple of months, guessed
+  // from when they were incorporated — the ones worth ringing this month.
+  // Only those you would ring: a firm already being quoted needs no approach.
+  if (view === "renewing") {
+    return businesses.filter(
+      (business) =>
+        (business.pipeline_status === "prospect" ||
+          business.pipeline_status === "contacted") &&
+        isRenewingSoon(business.incorporated, today),
     );
   }
 
@@ -223,12 +238,24 @@ export function filterBusinesses(
 export function sortBusinesses(
   businesses: Business[],
   sort: BoardSort,
+  today: string = todayIso(),
 ): Business[] {
   const sorted = [...businesses];
 
   sorted.sort((a, b) => {
     if (sort === "name") {
       return a.name.localeCompare(b.name);
+    }
+
+    if (sort === "renewal") {
+      // Soonest likely renewal first; a firm with no incorporation date has
+      // nothing to go on and sinks to the bottom. Ties by rating, then name.
+      return (
+        renewalSortKey(a.incorporated, today) -
+          renewalSortKey(b.incorporated, today) ||
+        (b.rating ?? 0) - (a.rating ?? 0) ||
+        a.name.localeCompare(b.name)
+      );
     }
 
     if (sort === "callable") {

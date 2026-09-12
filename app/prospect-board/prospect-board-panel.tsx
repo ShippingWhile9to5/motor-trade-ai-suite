@@ -27,6 +27,11 @@ import {
   sortBusinesses,
   todayIso,
 } from "../../lib/prospect-board";
+import {
+  RENEWING_SOON_MONTHS,
+  likelyRenewalWindow,
+  monthsUntilRenewal,
+} from "../../lib/likely-renewal";
 import { LOST_REASONS } from "../../lib/quote-tracker";
 import type {
   Business,
@@ -862,6 +867,12 @@ function ProspectCard({
     .filter(Boolean)
     .join(" · ");
   const attempts = describeAttempts(business);
+  // Worked out from the incorporation date and shown as the guess it is. A
+  // firm you have actually spoken to has a call-back date, which is the fact.
+  const renewal = likelyRenewalWindow(business.incorporated);
+  const renewingSoon = renewal
+    ? monthsUntilRenewal(renewal, todayIso()) <= RENEWING_SOON_MONTHS
+    : false;
 
   return (
     <div className="rounded-md border border-slate-200 bg-white">
@@ -890,6 +901,18 @@ function ProspectCard({
           ) : null}
           {summary ? (
             <span className="truncate text-xs text-slate-500">{summary}</span>
+          ) : null}
+          {renewal ? (
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                renewingSoon
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-100 text-slate-500"
+              }`}
+              title={`A guess from the incorporation date (${renewal.incorporatedLabel}): cover is usually taken out two or three months after a firm is set up, and renews on that anniversary. Confirm it when you speak to them.`}
+            >
+              Likely renewal {renewal.label}
+            </span>
           ) : null}
           {attempts ? (
             <span
@@ -1961,6 +1984,7 @@ export function ProspectBoardPanel({
           <option value="name">Sort: Name A–Z</option>
           <option value="rating">Sort: Rating</option>
           <option value="followUp">Sort: Follow-up date</option>
+          <option value="renewal">Sort: Likely renewal</option>
         </select>
         <button
           type="button"
